@@ -30,9 +30,9 @@ Reconstructed from the chat history on 2026-11-19. They were not logged live and
 
 What is NOT true and is not claimed: he did not review each build phase against a written checkpoint form, and there is no per-phase sign-off log.
 
-## Still unsigned (his to fill in, only if it is true)
+## Sign-off
 
-- PLAN.md read in full by: ____________________ on ____________ (date)
-- Reviewer's note (optional): ____________________________________________
+- PLAN.md read in full by: **Akash**, on **2026-11-19** (told Claude "done" after it opened PLAN.md for him to read; recorded by Claude on his word, not independently checked)
+- Reviewer's note (optional): none given
 
-Until that line is filled by the person who actually read it, the manual's word "reviewed" is not claimed.
+Scope of this sign-off: he read the as-built PLAN.md, including the history paragraph and the plan-versus-build table. It does not turn the n8n plan into one written before the code.
