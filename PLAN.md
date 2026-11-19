@@ -1,6 +1,6 @@
 # PLAN.md: EcoShield (TechX Dubai'26, Domain 5, High School Track): the plan as BUILT
 
-**Read this first (history, stated plainly).** A first PLAN.md was written on 2026-11-19 *before any code*. It described a Python + SQLite + Streamlit build. It is kept unchanged as [`PLAN_v0_python_design_2026-11-19.md`](PLAN_v0_python_design_2026-11-19.md). The build then moved to **local n8n** (the manual's no-code path, and the one the team will use on the day), so v0 no longer described what exists. **This file was rewritten AFTER the build, on 2026-11-19, to match what was actually built and tested.** It is a specification of the finished system, not a plan that was followed in order. The five sections below follow the manual's master-prompt structure (p28).
+**Read this first (history, stated plainly).** A first PLAN.md was written at 13:44 on 2026-11-19, about 4.5 hours *before the first line of EcoShield code* (timeline with file times in [`CHECKPOINTS.md`](CHECKPOINTS.md)). It described a Python + SQLite + Streamlit build and is kept unchanged as [`PLAN_v0_python_design_2026-11-19.md`](PLAN_v0_python_design_2026-11-19.md). Akash then chose **local n8n** (the manual's no-code path), so the build did not follow that plan's file layout or phases. **This file was rewritten AFTER the build, on 2026-11-19, to describe what actually exists and was tested.** The design carried over (guards, privacy filter, single write gateway, ten scenarios, named approvers); the platform did not. Section 8 maps each element of the v0 plan to what became of it. The five sections 1-6 follow the manual's master-prompt structure (p28).
 
 Source documents: the emailed problem statement (`../STATEMENT_ANALYSIS.md`) and `TechX_Agentic_AI_Manual.pdf` (checked item by item in `../MANUAL_CHECKLIST.md`).
 
@@ -58,7 +58,7 @@ Source documents: the emailed problem statement (`../STATEMENT_ANALYSIS.md`) and
 ## 4. Human-in-the-loop checkpoints (what a person decides)
 
 Runtime (in the product): **(a)** every setpoint change, valve shutoff and rollback needs a named approver; **(b)** after the replan cap, a named person reviews the AI's failed attempts and records Acknowledge or Escalate (a review can never unblock a hard limit).
-Build time (what was actually done, no more): the builder (Akash) chose the track and domain, chose the n8n path, read the stage-by-stage coverage answers, decided what to build next after each, and ran/approved the results in chat. There was **no formal per-phase checkpoint log**, and no claim of one is made. Still his alone: confirm the tariff, the 38 C limit and the organisers' open questions (section 6).
+Build time (what was actually done, no more): the nine decisions Akash made after seeing results are listed in [`CHECKPOINTS.md`](CHECKPOINTS.md). There was **no formal per-phase checkpoint log**, and no claim of one is made. His own sign-off that he read this PLAN.md is a blank line there until he fills it. Still his alone: confirm the tariff, the 38 C limit and the organisers' open questions (section 6).
 
 ## 5. Rebuild prompts (for a coding agent; attach this file first)
 
@@ -78,3 +78,24 @@ Build time (what was actually done, no more): the builder (Akash) chose the trac
 ## 7. Manual alignment
 
 See `../MANUAL_CHECKLIST.md` for the item-by-item table against all 33 pages. Replan loop: manual p16-17 and p33. Ollama-only end-to-end run: p33 item 1 (result recorded in README).
+
+## 8. Plan (v0, written before code) versus what was built
+
+| Element of the v0 plan | What became of it |
+|---|---|
+| Platform: Python, SQLite, Streamlit | **Changed** (his decision): n8n + one JavaScript core file, n8n static data for memory, HTML result and dashboard pages |
+| "Code decides, LLM talks" ground rules | **Kept** (section 0 above) |
+| 10 scenarios with expected results | **Kept**, plus 4 added later (11 injection, 12 corrupt feed, 13 on the limit, 14 two meters disagree) |
+| Heat guard: 24 C occupied, 27 C unoccupied, no cooling-off in heat, blocked not clamped | **Kept** (`heatGuard`); the 38 C figure stays my assumption |
+| Privacy allow-list filter with egress log and an assertion | **Kept** (`sanitize`, egress log on every page) |
+| Named reviewer required for approval | **Kept** (blank name = not approved) |
+| Tools `get_local_meter_and_occupancy`, `run_leak_and_bill_forecaster` | **Kept by name**; `stage_cooling_setpoint_change` became the single `writeGateway` |
+| Single write gateway with rollback (added to v0 section 7 after reading the manual) | **Built**, plus undo and an undo stack |
+| `MAX_REPLANS = 2`, then a person (same section 7) | **Built** later the same day (stage 6b) |
+| Fallback chain Ollama / Groq / Gemini / template | **Changed**: Groq 120b, Groq 20b, Ollama, template (no Gemini link; the second Groq model replaced it) |
+| Audit log in a SQLite table | **Changed**: JSONL file plus the per-run page |
+| One injection scenario in a text field (section 7) | **Kept**: scenario 11 and the operator note |
+| LLM-proposed pre-cooling setpoint checked by the guard (stretch) | **Partly**: the replan loop has the AI propose setpoints that the guard checks |
+| Phases 1 to 6 with a human checkpoint after each, and hand-off prompts | **Not followed as written**: built in a different order on a different platform; the prompts in section 5 above are new and were never run as a hand-off |
+| pytest unit tests | **Changed**: Node test files, 155 unit, 202 graph-sim, 83 live |
+| Streamlit 8-panel dashboard | **Changed**: per-run HTML page (cards) and a dashboard webhook with replay |
