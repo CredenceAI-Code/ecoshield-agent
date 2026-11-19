@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>EcoShield: Round 1 study guide</title>
+<style>
+@page { size: A4; margin: 13mm 14mm 14mm 14mm; }
+* { box-sizing: border-box; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10pt; line-height: 1.4; color: #1b2430; margin: 0; }
+h1 { font-size: 28pt; margin: 0 0 6px; color: #0b3d2e; line-height: 1.1; }
+h2 { font-size: 16pt; color: #0b3d2e; margin: 0 0 8px; padding-bottom: 5px; border-bottom: 2px solid #1f8a5b; page-break-after: avoid; }
+h3 { font-size: 11pt; margin: 10px 0 3px; color: #1f5f8a; page-break-after: avoid; }
+p { margin: 4px 0 6px; }
+ul, ol { margin: 4px 0 8px; padding-left: 20px; } li { margin: 2px 0; }
+.topic { page-break-before: always; }
+.cover { height: 235mm; display: flex; flex-direction: column; justify-content: center; }
+.sub { font-size: 13pt; color: #3b4a5a; margin: 6px 0 18px; }
+.pill { display: inline-block; background: #e3f4ec; color: #0b3d2e; border-radius: 12px; padding: 2px 10px; font-size: 9.5pt; margin: 0 4px 4px 0; }
+.tag { font-size: 9pt; color: #6b7785; }
+.box { border-radius: 6px; padding: 6px 11px; margin: 7px 0; page-break-inside: avoid; }
+.rem { background: #e8f4ff; border-left: 4px solid #1f6fb8; }
+.chk { background: #fff6e0; border-left: 4px solid #d99a00; }
+.warn { background: #fdeceb; border-left: 4px solid #c43d2f; }
+.ok { background: #e6f6ec; border-left: 4px solid #1f8a5b; }
+.box b.t { display: block; font-size: 9.5pt; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 2px; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0 10px; font-size: 9.2pt; page-break-inside: auto; }
+th, td { border: 1px solid #c9d2db; padding: 3px 6px; text-align: left; vertical-align: top; }
+th { background: #eef2f6; } tr { page-break-inside: avoid; }
+code { font-family: Consolas, monospace; font-size: 9.2pt; background: #f1f3f5; padding: 0 3px; border-radius: 3px; }
+.flow { font-family: Consolas, monospace; font-size: 9pt; background: #f6f8fa; border: 1px solid #d8dee4; border-radius: 6px; padding: 8px 10px; white-space: pre; page-break-inside: avoid; }
+.bar { font-size: 9pt; color: #6b7785; border-top: 1px solid #d8dee4; margin-top: 12px; padding-top: 4px; }
+.two { display: flex; gap: 12px; } .two > div { flex: 1; }
+</style></head><body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="tag">TechX Dubai 2026 &middot; AI Agent Arena &middot; High School Track &middot; Domain 5</div>
+  <h1>EcoShield:<br>learn it all for Round 1</h1>
+  <div class="sub">What the competition is, what the problem asks, what we built, why, and how to explain every part.</div>
+  <p><span class="pill">13 topics</span><span class="pill">Round 1 only</span><span class="pill">Written 19 Nov 2026</span></p>
+  <div class="box ok"><b class="t">How to use this</b>
+  Read one topic at a time, in order. Each ends with <b>Remember this</b> and a <b>Check yourself</b> question. Try the question before you look at the answer key at the back. If a question feels hard, re-read that topic, not the whole thing.</div>
+  <div class="box warn"><b class="t">Labels used throughout</b>
+  <b>FACT</b> = from the organisers' documents or tested. <b>OURS</b> = a choice we made. <b>ASSUMED</b> = not verified: say so out loud if asked.</div>
+  <p class="tag">Round 1 scope: Fri 20 Nov, 10:00&ndash;12:30, submission due 12:30. Round 2 edit drills and the Round 3 pitch are deliberately not in this guide.</p>
+</div>
+
+<!-- 90 SECOND VERSION -->
+<div class="topic">
+<h2>The 60-second version (learn this word for word first)</h2>
+<div class="box rem"><b class="t">Say this</b>
+&ldquo;EcoShield is an agent for a school or home that saves water and cooling energy. It reads smart-meter data, catches water leaks, forecasts the bill using the electricity and water price slabs, and handles requests to change the air-conditioning or shut the main water valve.<br><br>
+The AI never makes the safety decision. Plain code decides every number, every limit and every block. The AI only chooses the order of the tools, writes the explanation in plain English, and, when something is blocked, suggests a safer setpoint that the code checks again.<br><br>
+Anything risky, a setpoint change or a water shutoff, waits for a named human to approve. Everything is logged. And the occupancy data, who is in which room, never leaves the laptop: only an allow-listed, stripped version goes to the cloud AI.&rdquo;</div>
+<p>If you only remember one idea: <b>the AI talks, the code decides, a human approves.</b></p>
+<h3>Contents</h3>
+<table>
+<tr><td>1</td><td>Round 1 and how it is judged</td><td>8</td><td>Heat guard and privacy filter</td></tr>
+<tr><td>2</td><td>The problem (Domain 5)</td><td>9</td><td>Replan loop and human review</td></tr>
+<tr><td>3</td><td>Agent: AI vs code vs human</td><td>10</td><td>Approval, write gateway, undo, memory, audit log</td></tr>
+<tr><td>4</td><td>The pipeline, one request's journey</td><td>11</td><td>The fallback chain (when AI is down)</td></tr>
+<tr><td>5</td><td>Validating input</td><td>12</td><td>The 14 scenarios and the demo order</td></tr>
+<tr><td>6</td><td>The planner</td><td>13</td><td>Honest limits and judge questions</td></tr>
+<tr><td>7</td><td>The tools: leak detector and bill forecaster</td><td></td><td>Back: answer key, glossary, Friday checklist, file map</td></tr>
+</table>
+</div>
+
+<!-- TOPIC 1 -->
+<div class="topic">
+<h2>*** 1. Round 1: what it is and how it is judged</h2>
+<p><b>The event (FACT).</b> TechX Dubai 2026 is a student hackathon, a time-limited build competition, themed &ldquo;AI Agent Arena&rdquo;. It is run by the IEEE student branch of Symbiosis International University Dubai at Dubai Knowledge Park. About 60 teams entered across 5 domains. You are in the <b>High School Track</b> (Grades 9&ndash;12), <b>Domain 5: EcoShield</b>.</p>
+<table>
+<tr><th>Round</th><th>When</th><th>What happens</th></tr>
+<tr><td><b>1</b> &ldquo;Sandbox Sprint&rdquo;</td><td>Fri 20 Nov, 10:00&ndash;12:30</td><td>You polish and <b>submit by 12:30</b>. Judged <b>offline</b>. Top ~10 teams (about 2 per domain) go through, announced the same day.</td></tr>
+<tr><td>2 &ldquo;Edge-Case Semi-Finals&rdquo;</td><td>Fri 1:30&ndash;3:00</td><td>Only for those who qualify. (Not covered here.)</td></tr>
+<tr><td>3 &ldquo;Scratch Ideathon&rdquo;</td><td>Sat 21 Nov</td><td>(Not covered here.)</td></tr>
+</table>
+<p>Before Round 1 there is registration (8:00&ndash;9:00) and a briefing (9:00&ndash;9:30). <b>The briefing is where you ask your open questions.</b></p>
+<h3>What &ldquo;judged offline&rdquo; means for you</h3>
+<p>The judges look at your submission without you next to it explaining. So it has to explain itself. A judge opening it cold should see within a minute: what the problem is, what you built, that every required feature is met, and that it is safe. We already have the pieces: <code>README.md</code>, <code>ARCHITECTURE_NOTE.md</code>, the data CSVs, the workflow export, and result pages that show a safe case, an approved case and a blocked case.</p>
+<h3>How the 10 teams are picked (organisers' order, FACT)</h3>
+<ol><li><b>Did you meet the statement's required features?</b> This is the gate.</li>
+<li><b>Innovation</b> gets the most extra credit once the features are met. Ours: the replan loop, undo and memory, the fallback chain, four extra edge-case scenarios.</li>
+<li><b>Business value</b> matters mostly later, so it is minor for Round 1.</li></ol>
+<p>The judges said they care less about how clever the AI is and more about whether the agent is <b>safe, reliable and easy to explain</b>. AI-assisted building is allowed, but you must be able to explain every part. That is what the rest of this guide is for.</p>
+<div class="box warn"><b class="t">Still unknown (ask at the 9:00 briefing)</b>
+Exactly what you submit at 12:30: the workflow file, screenshots, a video, or a live demo? Also: are pre-built workflows allowed, which n8n version and is Ollama installed, are 24 &deg;C and 27 &deg;C the exact limits, and which tariff to use.</div>
+<div class="box rem"><b class="t">Remember this</b>Round 1 is offline, so the submission must explain itself. Features first, then innovation. The exact submission format is still unknown: ask.</div>
+<div class="box chk"><b class="t">Check yourself</b>Why does &ldquo;judged offline&rdquo; change what you prepare, and what one thing about the 12:30 submission do you still need to ask?</div>
+</div>
+
+<!-- TOPIC 2 -->
+<div class="topic">
+<h2>*** 2. The problem: Domain 5, EcoShield</h2>
+<p><b>The story (FACT).</b> A smart home or school has <b>smart meters</b>, devices that record water flow and electricity use every hour. Waste hides in that data: a pipe leaking quietly at night, or cooling running far too hard. You build an <b>autonomous agent</b>, one that watches the data and acts without being told every step, to save water and cooling energy. The catch: it must never make things unsafe.</p>
+<h3>The six things the statement requires</h3>
+<table>
+<tr><th>#</th><th>Requirement</th><th>In plain words</th></tr>
+<tr><td>1</td><td><b>Leak detector</b></td><td>Spot leaks in meter data. Their example: a steady <b>45 L/h at 2 AM</b> when the building is empty. Nobody uses 45 litres an hour while asleep, so something is leaking.</td></tr>
+<tr><td>2</td><td><b>Bill forecaster</b></td><td>Predict the month's bill with UAE prices. Prices rise in steps called <b>slabs</b>: the first chunk of units costs one rate, the next chunk costs more.</td></tr>
+<tr><td>3</td><td><b>Privacy filter</b></td><td><b>Occupancy</b> data (who is in which room, and when) must never leave the device.</td></tr>
+<tr><td>4</td><td><b>Heat-safety guard</b></td><td>The AI may never set the indoor temperature unsafely. Examples given: never above <b>24 &deg;C when people are inside</b>; never above <b>27 &deg;C when pre-cooling an empty building</b>.</td></tr>
+<tr><td>5</td><td><b>Human approval</b></td><td>Changing a <b>setpoint</b> (the AC's target temperature) or shutting the main water valve needs a person. Leak alerts and bill forecasts may run automatically.</td></tr>
+<tr><td>6</td><td><b>Ten test scenarios</b></td><td>Shown in a dashboard. <b>No dataset is provided</b>, so we generate our own fake (&ldquo;synthetic&rdquo;) data.</td></tr>
+</table>
+<p>The line judges care about most: a <b>&ldquo;clear, undeniable separation&rdquo;</b> between what the AI (LLM) does and what the traditional code does. That sentence is our whole design.</p>
+<div class="box warn"><b class="t">What is fixed and what is our choice</b>
+24 &deg;C and 27 &deg;C come from the statement but were written as &ldquo;e.g.&rdquo;, so they are not confirmed as exact. Everything else (leak thresholds, tariff numbers, the 38 &deg;C heat limit) is <b>ours</b>.</div>
+<div class="box ok"><b class="t">Ten vs fourteen scenarios</b>
+The statement requires <b>10</b>. We built <b>14</b>: scenarios 1&ndash;10 cover the required ten, and 11&ndash;14 are our extras (injection, corrupt feed, setpoint exactly on the limit, two meters disagree). Say &ldquo;the ten required scenarios plus four edge cases we added&rdquo;.</div>
+<div class="box rem"><b class="t">Remember this</b>Six requirements: leak detector, bill forecaster, privacy, heat guard, human approval, ten scenarios. Numbers: 24 &deg;C occupied, 27 &deg;C unoccupied pre-cool.</div>
+<div class="box chk"><b class="t">Check yourself</b>Which of the six may run automatically, which two need a human, and what are the two temperature limits?</div>
+</div>
+
+<!-- TOPIC 3 -->
+<div class="topic">
+<h2>*** 3. What an agent is, and the AI / code / human split</h2>
+<p><b>LLM.</b> A large language model is the AI behind ChatGPT. It predicts text. It is very good with language and messy information, and it can be <b>confidently wrong</b>, because it produces plausible answers rather than calculating exact ones.</p>
+<p><b>Agent.</b> An LLM that can decide what to do next and call <b>tools</b>, which are ordinary code functions. A chatbot only talks. An agent <i>does</i> things: reads meter data, runs a calculation, asks to change a setpoint.</p>
+<p><b>The danger.</b> If an LLM can act and can also guess wrong, it could switch off cooling in 46 &deg;C heat. So the organisers' design idea is to split the work three ways:</p>
+<table>
+<tr><th>Who</th><th>Does what</th><th>Why</th></tr>
+<tr><td><b>The AI</b></td><td>Reasons, plans, drafts text</td><td>Good with language and messy input</td></tr>
+<tr><td><b>Your code</b></td><td>Checks limits, does maths, writes changes</td><td>Exact; never guesses</td></tr>
+<tr><td><b>A human</b></td><td>Approves risky actions</td><td>People stay responsible</td></tr>
+</table>
+<h3>In our build</h3>
+<div class="two"><div><b>The AI does</b><ul><li>Picks the order of the tools</li><li>Writes the plain-English explanation</li><li>After a block, proposes one safer setpoint</li></ul></div>
+<div><b>Code does (never the AI)</b><ul><li>Leak verdict and bill maths</li><li>Every temperature limit and every block</li><li>Re-checks the AI's proposal</li><li>Privacy filter, injection scan, data checks</li><li>Memory, logging, rollback, the write</li></ul></div></div>
+<p><b>The key property.</b> Even if the AI says something wrong or hostile, the code and the human still protect the building. The safety does not depend on the AI behaving well. If every AI is down, the safety logic still works.</p>
+<h3>Who blocks, who approves</h3>
+<ul><li><b>Code blocks what is forbidden.</b> 30 &deg;C in an empty building is above the 27 &deg;C ceiling, so the code blocks it at once. No AI and no person is asked first.</li>
+<li><b>A human approves what is allowed but risky.</b> 23 &deg;C in an occupied room is inside the limits but still changes the building, so a person says yes.</li>
+<li><b>A person can never override a limit.</b> After the AI's replan tries run out, a person only records &ldquo;Acknowledge&rdquo; or &ldquo;Escalate&rdquo;. That never unblocks anything.</li></ul>
+<div class="box ok"><b class="t">Why the AI is in the system at all (OURS, honest)</b>
+Its role is deliberately bounded. The statement requires the hard rules to be in code, so the AI's real jobs are language (the explanation) and flexible suggestions (a safer setpoint, the tool order). The AI can make the system more cautious or leave it unchanged. It cannot make it less safe.</div>
+<div class="box rem"><b class="t">Remember this</b>Agent = LLM + tools. The AI talks, the code decides, a human approves. Code blocks the forbidden; a human approves the allowed-but-risky.</div>
+<div class="box chk"><b class="t">Check yourself</b>(a) A request asks for 30 &deg;C in an empty building: who blocks it? (b) A request asks for 23 &deg;C in an occupied room and the code allows it: who must say yes before it happens?</div>
+</div>
+
+<!-- TOPIC 4 -->
+<div class="topic">
+<h2>*** 4. The pipeline: one request's journey</h2>
+<p>The manual has a 10-stage diagram and ours follows it. Think of one request travelling through, for example &ldquo;switch cooling off at 46 &deg;C&rdquo; (scenario 6).</p>
+<div class="flow">1 Trigger     person picks a scenario on the console form
+2 Validate    code checks the note and the meter data       (bad input stops here)
+3 Plan        AI picks the next tool, from a list the code builds
+4 Act         code runs the tool    (loops 3-4 until the safety check has run)
+5 Remember    device state and past decisions are saved
+6 Guard       heatGuard (code) checks the request against the limits
+6b Replan     if blocked but fixable: AI proposes a safer setpoint (max 2 tries)
+7 Route       safe things run automatically; risky things go to a human form
+8 Write       ONE write function: re-check, snapshot, apply, roll back on failure
+9 Log         audit file + result page
+10 Demo       per-run page, dashboard, replay of any past case</div>
+<table>
+<tr><th>Who does each stage</th><th>Stages</th></tr>
+<tr><td>Code only</td><td>2 Validate, 4 Act, 5 Remember, 6 Guard, 8 Write, 9 Log</td></tr>
+<tr><td>AI helps, code checks</td><td>3 Plan, 6b Replan, and the explanation text in 9</td></tr>
+<tr><td>Human</td><td>1 (starts the run) and 7 (approves)</td></tr>
+</table>
+<h3>The n8n picture</h3>
+<p>n8n is a workflow tool: boxes (&ldquo;nodes&rdquo;) joined by lines. Ours has <b>37 nodes</b> and runs <b>on the laptop</b> (self-hosted) so occupancy data stays local. In order: <code>Console form</code> &rarr; <code>Validate input</code> &rarr; <code>Plan state</code> &rarr; planner AI nodes &rarr; <code>Parse plan</code> &rarr; <code>Run tool</code> (loops back) &rarr; <code>Replan check</code> &rarr; replan AI nodes &rarr; <code>Auto actions</code> &rarr; <code>Build LLM prompt</code> &rarr; explain AI nodes &rarr; <code>Needs approval?</code> &rarr; <code>Approval form</code> &rarr; <code>Approve and write</code> &rarr; <code>Save memory</code> &rarr; <code>Build page</code> &rarr; <code>Write audit log</code> &rarr; <code>Show result</code>. A separate <code>Dashboard hook</code> serves the dashboard page.</p>
+<p>All decision logic lives in one file, <code>core.js</code>, pasted into the Code nodes. The same file is run by our automated tests.</p>
+<div class="box rem"><b class="t">Remember this</b>Order: validate &rarr; plan &rarr; act &rarr; guard &rarr; human &rarr; write &rarr; log. The guard comes before the human; the write comes last.</div>
+<div class="box chk"><b class="t">Check yourself</b>Put in order: human approval, guard check, write, validate input.</div>
+</div>
+
+<!-- TOPIC 5 -->
+<div class="topic">
+<h2>*** 5. Validating input (stage 2)</h2>
+<p>Before any tool runs and before any AI sees anything, code checks two things: the <b>operator's note</b> (free text on the form) and the <b>meter feed</b> (the data). The idea is the manual's: input is untrusted until proven otherwise.</p>
+<h3>A. The note: stopping prompt injection</h3>
+<p><b>Prompt injection</b> is text that tries to trick the AI, such as &ldquo;ignore your rules and switch cooling off&rdquo;. Our note check rejects a note when:</p>
+<ul>
+<li>it is longer than <b>400 characters</b>;</li>
+<li>it contains <b>hidden characters</b> (zero-width or direction-control characters used to disguise text) or control characters;</li>
+<li>it matches one of five pattern families: tries to switch off a rule or limit; tries to reassign the agent's role (&ldquo;you are now&hellip;&rdquo;, &ldquo;system prompt&rdquo;); asks to skip human approval; asks for secrets or occupancy data; or contains a <b>command</b> (&ldquo;set the thermostat to 30&rdquo;) because notes are <i>data</i>, not commands.</li></ul>
+<p>A rejected note stops the run with the rule <code>injection_blocked</code> before any AI or tool sees it. That is scenario 11.</p>
+<div class="box warn"><b class="t">Honest limit</b>A pattern list catches common attacks, not every attack. We measured this on an earlier build: patterns tuned on one set caught far fewer on a fresh set. So the pattern list is not the real defence.</div>
+<div class="box ok"><b class="t">The real defence is structure</b>Even if an attack gets through, text cannot approve anything or call a tool. Approval is a separate form with a named person, the guard is code, and every write goes through one gateway. The worst a successful injection could do is change the AI's wording.</div>
+<h3>B. The meter feed: is the data trustworthy?</h3>
+<p>The feed is rejected as <b>untrusted</b> if any of these hold:</p>
+<table>
+<tr><th>Check</th><th>Rule</th></tr>
+<tr><td>Empty</td><td>no readings at all</td></tr>
+<tr><td>Duplicates</td><td>two readings for the same day and hour</td></tr>
+<tr><td>Impossible values</td><td>outside allowed ranges, e.g. water outside 0&ndash;2000 L/h, electricity outside 0&ndash;200 kWh, outdoor outside &minus;10 to 60 &deg;C, negative flow</td></tr>
+<tr><td>Two sources disagree</td><td>the main and check water meters differ by more than 30% (and more than 5 L/h) on <b>6 or more</b> readings</td></tr>
+<tr><td>Stale</td><td>the newest reading is more than <b>2 hours</b> old</td></tr>
+</table>
+<p>Gaps (missing readings, shown as null) are allowed here and are judged later by the leak detector. If the feed fails, the rule is <code>untrusted_data</code> and <b>nothing is allowed until the data is trustworthy</b>: the system &ldquo;fails closed&rdquo;. That is scenarios 12 (corrupt and stale feed) and 14 (two meters disagree).</p>
+<div class="box rem"><b class="t">Remember this</b>Validate the note (length, hidden characters, five pattern families) and the feed (empty, duplicate, impossible, disagreeing, stale) before anything else. Bad data fails closed. Structure, not patterns, is the real injection defence.</div>
+<div class="box chk"><b class="t">Check yourself</b>(a) Why is a pattern list not enough against injection, and what is the real protection? (b) A reading is 3 hours old: what happens?</div>
+</div>
+
+<!-- TOPIC 6 -->
+<div class="topic">
+<h2>*** 6. The planner (stage 3): the AI chooses, the code enforces</h2>
+<p>The agent has <b>four tools</b>: <code>read_meter_data</code>, <code>run_leak_and_bill_forecaster</code>, <code>lookup_case_history</code> and <code>check_safety_guard</code>, plus <code>finish</code>. The <b>planner</b> is the AI step that says which to use next. This is what makes it an agent rather than a fixed script.</p>
+<h3>How one planning turn works</h3>
+<ol>
+<li>Code works out which tools are <b>allowed right now</b> (the &ldquo;allow-list&rdquo;). Examples: until the meter data has been read, only <code>read_meter_data</code> is allowed; the forecaster is allowed only if the data is OK; <code>finish</code> only after the safety check has run.</li>
+<li>The AI is shown a <b>sanitised</b> view: scenario number, steps used, tools done, the allowed list, data OK or not, leak verdict, guard status. No occupancy and no raw readings.</li>
+<li>The AI replies with its choice. Code <b>parses</b> it.</li>
+<li>If the choice is not on the allowed list, or the reply is garbage, code <b>overrides</b> it. After <b>2 bad picks</b>, or if every planner AI is down, the system switches to a fixed order.</li>
+<li>Code runs the chosen tool with arguments <b>code builds</b>. The AI never touches the data.</li>
+<li>Loop, with a hard cap of <b>8 steps</b>.</li></ol>
+<div class="flow">Plan state -> Ask planner? -> Groq plan / Groq 20B plan / Ollama plan -> Parse plan
+   -> Finished? -> Run tool -> (back to Plan state)</div>
+<h3>Why this is still a real agent (and the honest caveat)</h3>
+<p>An LLM really is in the loop choosing tools, and the code really does enforce the limits on its choices. <b>Honest caveat (my assessment):</b> because the allow-list is tight, the AI's real freedom is small, mostly the order of the middle steps and whether to look up past cases. The design is deliberately safe rather than AI-heavy. If a judge asks &ldquo;what does the AI actually decide?&rdquo;, answer exactly that.</p>
+<div class="box rem"><b class="t">Remember this</b>Four tools. Code builds the allowed list and the arguments; the AI only picks from the list. Wrong pick overridden; 2 bad picks or AI down &rarr; fixed order; cap 8 steps.</div>
+<div class="box chk"><b class="t">Check yourself</b>The planner AI returns a tool that is not on the allowed list. What does the system do, and what happens if this keeps happening?</div>
+</div>
+
+<!-- TOPIC 7 -->
+<div class="topic">
+<h2>*** 7. The tools (stage 4): leak detector and bill forecaster</h2>
+<h3>The data</h3>
+<p>No dataset was given, so code generates <b>synthetic</b> hourly data for one 30-day month (&ldquo;today&rdquo; is day 22): water in litres per hour, electricity in kWh, whether the building is occupied, outdoor temperature, setpoint. Each scenario plants a story in it (a leak starting on day 17, a weekend leak, and so on). The data is fake; the logic that reads it is real.</p>
+<h3>Tool 1: <code>read_meter_data</code></h3>
+<p>Fetches the scenario's readings and runs the input checks from topic 5.</p>
+<h3>Tool 2: the leak detector (OURS: thresholds are our choices)</h3>
+<ul>
+<li>Look only at <b>night hours (hours 1 to 5)</b> when the building is <b>empty</b>, over the last 7 days.</li>
+<li><b>LEAK:</b> flow of at least <b>10 L/h</b> at night on at least <b>2 nights</b>, <i>or</i> an unbroken run of <b>24 hours</b> of empty-building flow at or above 10 L/h. It also estimates litres per hour and per day, and when it started.</li>
+<li><b>WATCH:</b> a small constant night flow between 3 and 10 L/h on at least 3 nights. Worth watching, not an alarm.</li>
+<li><b>INSUFFICIENT_DATA:</b> if more than <b>20%</b> of the night hours are missing, no call is made: &ldquo;we don't know&rdquo; beats a guess.</li>
+<li><b>NO_LEAK</b> otherwise. If people are present (occupied), their night water use is not counted: that is why the night cleaning crew in scenario 5 is not a leak.</li></ul>
+<h3>Tool 3: the bill forecaster</h3>
+<p><b>Slabs:</b> the price rises in bands. <b>ASSUMED tariff</b> (from secondary web guides, not checked against DEWA):</p>
+<table>
+<tr><th>Electricity (per kWh)</th><th>Water (per imperial gallon)</th></tr>
+<tr><td>0&ndash;2,000: 0.23 AED<br>2,000&ndash;4,000: 0.28<br>4,000&ndash;6,000: 0.32<br>above 6,000: 0.38<br>plus a fuel surcharge of 0.065 AED per kWh</td><td>0&ndash;6,000: 0.03 AED<br>6,000&ndash;12,000: 0.035<br>above 12,000: 0.04<br>(litres are converted to gallons: &divide; 4.54609)</td></tr></table>
+<p><b>Worked example (electricity only, assumed tariff):</b> 2,500 kWh &rarr; first 2,000 &times; 0.23 = 460; next 500 &times; 0.28 = 140; slab total 600; fuel surcharge 2,500 &times; 0.065 = 162.50; total <b>762.50 AED</b>. This slab-by-slab working is shown on every result page so a judge can inspect it.</p>
+<p><b>Forecast method:</b> month so far + (average of the last 14 full days &times; days remaining). If a leak is found, the forecaster prices the month again <b>without</b> the leak; the difference is the <b>leak's bill impact in AED</b>. It is a naive projection, not a prediction.</p>
+<h3>Tools 4 and 5</h3>
+<p><code>lookup_case_history</code> reads memory: past decisions and open alerts for this scenario. <code>check_safety_guard</code> runs the heat guard (topic 8) on the request.</p>
+<div class="box rem"><b class="t">Remember this</b>Leak = at least 10 L/h at night, empty building, 2 nights or a 24 h run; WATCH = 3&ndash;10 L/h on 3 nights; missing &gt;20% of night hours = INSUFFICIENT_DATA. Bill = slabs + surcharge, shown step by step; leak impact = with leak minus without. Tariff is ASSUMED.</div>
+<div class="box chk"><b class="t">Check yourself</b>(a) Scenario 4 has about 6 L/h all day. Which verdict? (b) Why is scenario 5's night water use not a leak? (c) Which two things about the tariff must you say honestly?</div>
+</div>
+
+<!-- TOPIC 8 -->
+<div class="topic">
+<h2>*** 8. The heat guard and the privacy filter (stage 6)</h2>
+<h3>The heat guard (<code>heatGuard</code>)</h3>
+<p>One function, all rules in one object (<code>LIMITS</code>). The AI can change none of it. It checks in this order, and the <b>first rule that fires wins and is named</b>:</p>
+<table>
+<tr><th>#</th><th>Check</th><th>Result</th></tr>
+<tr><td>1</td><td>Request is to send occupancy data out</td><td>BLOCKED: <code>privacy_export_blocked</code></td></tr>
+<tr><td>2</td><td>Data not trustworthy</td><td>BLOCKED: <code>untrusted_data</code></td></tr>
+<tr><td>3</td><td>It is just a leak alert</td><td>AUTO: allowed, logged, undoable</td></tr>
+<tr><td>4</td><td>Setpoint above <b>24 &deg;C</b> while occupied</td><td>BLOCKED: <code>occupied_over_limit</code></td></tr>
+<tr><td>5</td><td>Setpoint above <b>27 &deg;C</b> while empty</td><td>BLOCKED: <code>unoccupied_over_precool_ceiling</code></td></tr>
+<tr><td>6</td><td>Cooling switched <b>off</b> while occupied and outdoor &ge; <b>38 &deg;C</b></td><td>BLOCKED: <code>cooling_off_in_heat</code></td></tr>
+<tr><td>7</td><td>The requested state already holds</td><td>NO_CHANGE: nobody is asked again</td></tr>
+<tr><td>8</td><td>Everything else</td><td>NEEDS_APPROVAL (a person must say yes)</td></tr>
+</table>
+<ul><li><b>24 and 27 &deg;C</b> are from the statement (&ldquo;e.g.&rdquo;). <b>38 &deg;C is ASSUMED: our guess.</b></li>
+<li>The rule is &ldquo;<b>above</b> 27&rdquo;, so exactly 27.0 is allowed and 27.1 is blocked (scenario 13).</li>
+<li>Blocked means <b>blocked</b>, not &ldquo;clamped&rdquo;: the code does not quietly change 30 to 27. It refuses, and a safer value must come back through the checks again.</li></ul>
+<h3>The privacy filter (<code>sanitize</code>)</h3>
+<p>Whatever goes to a cloud AI is built by <b>one function</b> using an <b>allow-list</b>: a list of exactly which fields may leave (leak verdict, bill totals, guard result, requested setpoint, and so on). Anything not on the list is stripped. An <b>allow-list</b> is safer than a block-list because a new, forgotten field is blocked by default.</p>
+<ul>
+<li><b>Neutral words:</b> the AI never sees &ldquo;occupied&rdquo;. A rule such as &ldquo;occupied over limit&rdquo; is relabelled &ldquo;setpoint above comfort limit&rdquo;, so even the wording gives nothing away.</li>
+<li><b>Assertion:</b> after building the payload, code scans it for occupancy-like words. If one survived, the run crashes loudly instead of leaking.</li>
+<li><b>Egress log:</b> every result page lists where data went, the fields sent, the fields stripped, and &ldquo;occupancy sent: false&rdquo;.</li>
+<li><b>Scenario 10</b> shows it: a request to export occupancy is blocked and the page shows exactly what did not leave.</li></ul>
+<p><b>Honest caveat:</b> the audit file on the laptop <i>does</i> contain occupancy. The rule is that it never goes to the cloud, not that it is never stored.</p>
+<div class="box rem"><b class="t">Remember this</b>Guard order: export, untrusted data, alert, 24 limit, 27 limit, cooling-off at 38, no-change, needs approval. Limits are code, not AI. Privacy: allow-list, neutral words, an assertion, and an egress log.</div>
+<div class="box chk"><b class="t">Check yourself</b>(a) Which rule blocks a 28 &deg;C request in an empty building? (b) Why an allow-list instead of a block-list? (c) Which of the three numbers 24, 27, 38 is our own guess?</div>
+</div>
+
+<!-- TOPIC 9 -->
+<div class="topic">
+<h2>** 9. The replan loop and human review (stage 6b)</h2>
+<p><b>The problem it solves.</b> Sometimes the first plan is blocked but a <i>safer</i> version of it would be fine, such as 30 &deg;C when 27 &deg;C would be allowed. The manual's pattern: send the rejected plan back to the AI to try again, but <b>cap it</b>, then hand over to a person. Ours is capped at <b>2 replans</b>.</p>
+<h3>How it works</h3>
+<ol>
+<li>Only three blocks can be replanned: occupied over the limit, unoccupied over the ceiling, and cooling-off in heat.</li>
+<li>The AI is told only: the first plan was rejected by a hard safety rule; propose <b>one</b> safer setpoint or NONE. It is given the original setpoint, the outdoor temperature, the attempt number and its earlier failed proposals. It is <b>not given the limit values, the rule names, or anything about occupancy</b>, so it cannot just echo a limit.</li>
+<li>Code parses the reply (it must be a number between 10 and 40, or NONE). Garbage counts as an attempt.</li>
+<li>Code runs the proposal through the <b>same</b> <code>heatGuard</code>. The result is recorded: <i>passed</i>, <i>rejected</i>, <i>unreadable</i>, <i>gave up</i> or <i>no effect</i>.</li>
+<li>If it passes, the new setpoint still needs <b>human approval</b> and goes through the gateway as usual.</li>
+<li>After 2 failed attempts (or the AI gives up, or no AI answers), a <b>review form</b> shows the person the failed attempts with reasons. They record <b>Acknowledge</b> or <b>Escalate</b> with their name. This changes nothing: <b>a review can never unblock a hard limit</b>.</li></ol>
+<p><b>Never replanned:</b> privacy blocks, injection blocks and untrusted data. An AI cannot fix those, and asking would only waste quota.</p>
+<p><b>What you will see:</b> on the strong cloud model the first proposal usually passes. On the small local model it often fails twice and the cap sends the case to a person: exactly what the cap is for. Scenarios 6 and 7 show it.</p>
+<div class="box rem"><b class="t">Remember this</b>Replan: blocked but fixable &rarr; AI proposes &rarr; same guard re-checks &rarr; max 2 tries &rarr; then a named person reviews. Hard blocks are never replanned. A review can never unblock a limit.</div>
+<div class="box chk"><b class="t">Check yourself</b>(a) Which blocks are never sent for replanning, and why? (b) What can a person do at the review step, and what can they not do?</div>
+</div>
+
+<!-- TOPIC 10 -->
+<div class="topic">
+<h2>*** 10. Approval, the write gateway, undo, memory and the audit log (stages 5, 7, 8, 9)</h2>
+<h3>Human approval (stage 7)</h3>
+<p>Setpoint changes, valve shutoffs and rollbacks pause at a form: <b>Approve or Reject plus a reviewer name</b>, with an optional note (kept in the log, shown on the page, <b>never sent to an AI</b>). A <b>blank name counts as not approved</b>. Leak alerts do not need approval because they are low risk, logged and reversible.</p>
+<h3>The write gateway (stage 8)</h3>
+<p>One function, <code>writeGateway</code>, is the <b>only</b> thing that changes state (the device record). It:</p>
+<ol><li><b>re-checks every limit</b> itself (so even a bug upstream cannot sneak a bad write through);</li>
+<li>takes a <b>snapshot</b> of the state first;</li>
+<li>applies the change;</li>
+<li>on any failure <b>rolls back</b> to the snapshot (all or nothing).</li></ol>
+<p>Allowed actions: set a setpoint, switch cooling off, close the main valve, raise a leak alert, roll back. <b>Honest caveat:</b> the device is a <b>simulated record</b>, not real hardware.</p>
+<h3>Undo</h3>
+<p>Choosing UNDO on the form rolls back the last change, using a stack of snapshots. Undoing is itself a write, so it also needs a person's approval and passes the guard. If there is nothing to undo, it says so.</p>
+<h3>Memory (stage 5)</h3>
+<p>Kept between runs and across restarts (stored in n8n's own database): the device state per scenario, the last 30 cases, earlier decisions, and the undo stack. Uses: a repeated request is recognised (&ldquo;already in that state, nothing repeated&rdquo;), an open leak alert is not raised twice, and the approver sees the earlier decision. <b>RESET</b> on the form clears it for a clean demo. <b>Caveat:</b> two approvals paused at once could overwrite each other's memory (untested), so do one approval at a time.</p>
+<h3>The audit log (stage 9)</h3>
+<p>Every run appends a line to <code>ecoshield_audit.jsonl</code> (a text file, one JSON record per line): inputs, tool calls, each AI call and the fields it was sent, the decision, the approver, the memory commit. A per-run page shows the same story, and the dashboard can <b>replay</b> any past case from the log with no tools and no AI re-run.</p>
+<div class="box rem"><b class="t">Remember this</b>Named approver required (blank = no). One gateway: re-check, snapshot, apply, roll back. Undo is also a guarded write. Memory survives restarts; one approval at a time. Every run is logged and replayable.</div>
+<div class="box chk"><b class="t">Check yourself</b>(a) Why does the gateway re-check the limits when the guard already did? (b) What is true about a blank reviewer name? (c) What do you do between demos to start clean?</div>
+</div>
+
+<!-- TOPIC 11 -->
+<div class="topic">
+<h2>*** 11. The fallback chain: when the AI is down</h2>
+<p>Free AI services get <b>rate-limited</b> (the error code is <b>429</b>: too many requests), go down, or lack a model. The manual wants failure handling shown. Ours is a chain used for each AI step (plan, replan, explain):</p>
+<div class="flow">Groq gpt-oss-120b  ->  Groq gpt-oss-20b  ->  Ollama qwen3:1.7b (local)  ->  plain-code template</div>
+<ul>
+<li><b>Groq gpt-oss-120b</b>: the main cloud model (free tier).</li>
+<li><b>Groq gpt-oss-20b</b>: a second model with <b>its own rate limit</b>, so one hitting 429 doesn't stop the other. The manual's suggested llama-3.1-8b-instant returned &ldquo;not found&rdquo; on our key, so we found what the key could use.</li>
+<li><b>Ollama</b> runs a small model on the laptop: free, no key, works offline. We tested the <b>whole pipeline on Ollama alone</b> (72 checks passed). We found and fixed a bug there: n8n looked for Ollama at <code>localhost</code> (which resolves to an IPv6 address), but Ollama listens on IPv4, so the address is now <code>127.0.0.1</code>.</li>
+<li><b>Template:</b> if every AI fails, the explanation is a plain-code sentence built from the numbers. Nothing in the safety logic needs an AI.</li></ul>
+<h3>Guarding the AI's text</h3>
+<p>The explanation step is the one place the AI writes text for a person. A <b>numbers guard</b> checks it: if the text quotes a number the AI was not given (an invented figure), the text is <b>discarded</b> and the template is used. The page says which model wrote the text (&ldquo;Written by Groq gpt-oss-120b&rdquo;, &ldquo;Ollama&rdquo;, or &ldquo;No AI text used&rdquo;).</p>
+<h3>Other limits that protect you</h3>
+<ul><li>Every AI call has a timeout and at most 2 tries.</li><li>Every loop is capped: 8 planner steps, 2 bad picks, 2 replans.</li><li>We ran <b>42 runs back to back</b> (14 scenarios &times; 3 rounds) with no rate-limit errors. That proves one moment on one free key, not a guarantee, so repeat it on the day: <code>node tests/quota_run.js 3</code>.</li></ul>
+<div class="box rem"><b class="t">Remember this</b>Chain: Groq 120b &rarr; Groq 20b &rarr; Ollama &rarr; template. Safety never depends on the AI. Invented numbers in AI text are discarded. Test the fallback, not just the happy path.</div>
+<div class="box chk"><b class="t">Check yourself</b>(a) Why is the second Groq model useful? (b) If every AI is down, what still works and what changes? (c) What was the IPv6 bug?</div>
+</div>
+
+<!-- TOPIC 12 -->
+<div class="topic">
+<h2>*** 12. The 14 scenarios and the demo order</h2>
+<p>The dashboard has a dropdown of 14 scenarios. The statement requires 10; 11&ndash;14 are our extras.</p>
+<table>
+<tr><th>#</th><th>Scenario</th><th>What happens</th></tr>
+<tr><td>1</td><td>Overnight hidden pipe leak</td><td>45 L/h at 2 AM, empty building. <b>LEAK</b>; shutoff needs approval; bill impact shown.</td></tr>
+<tr><td>2</td><td>Normal month</td><td>Nothing wrong; a routine 23 &deg;C setpoint needs approval. The safe case.</td></tr>
+<tr><td>3</td><td>Weekend-long leak</td><td>Started Saturday, ran all weekend. <b>LEAK</b>.</td></tr>
+<tr><td>4</td><td>Small drip below threshold</td><td>About 6 L/h. Only a <b>WATCH</b>.</td></tr>
+<tr><td>5</td><td>Night cleaning crew</td><td>Water 2&ndash;4 AM but people are present: <b>not a leak</b>.</td></tr>
+<tr><td>6</td><td>46 &deg;C afternoon, AC shutoff</td><td>An automation wants cooling off during exams: <b>BLOCKED</b> (cooling_off_in_heat); replan.</td></tr>
+<tr><td>7</td><td>Pre-cooling above the ceiling</td><td>Empty at 5 AM, asked for 30 &deg;C: <b>BLOCKED</b> (over the 27 ceiling); replan.</td></tr>
+<tr><td>8</td><td>High month crosses a slab</td><td>More cooling pushes use into the next price band: the slab maths is visible.</td></tr>
+<tr><td>9</td><td>Missing meter hours</td><td><b>INSUFFICIENT_DATA</b>: we say &ldquo;don't know&rdquo;.</td></tr>
+<tr><td>10</td><td>Send the occupancy schedule out</td><td><b>BLOCKED</b> (privacy_export_blocked). The page shows what did not leave.</td></tr>
+<tr><td>11</td><td>Prompt injection in a note (extra)</td><td>Blocked up front; no AI sees it.</td></tr>
+<tr><td>12</td><td>Corrupt and stale feed (extra)</td><td>Impossible readings, 6 hours old: <b>untrusted</b>; nothing judged.</td></tr>
+<tr><td>13</td><td>Exactly on the limit (extra)</td><td>Asks for exactly 27 &deg;C: <b>allowed</b> (rule is &ldquo;above 27&rdquo;), still needs approval.</td></tr>
+<tr><td>14</td><td>Two meters disagree (extra)</td><td>Main and check meter differ by more than 30%: <b>untrusted</b>.</td></tr>
+</table>
+<p>In scenarios 4, 5, 8 and 9 the routine request is 23 &deg;C, because 24 &deg;C would equal the starting setpoint and the system would correctly say &ldquo;no change needed&rdquo;.</p>
+<h3>Your demo order (about 4 minutes)</h3>
+<div class="flow">1. Scenario 2  safe case: approve it            ("human approves what's allowed")
+2. Scenario 1  leak + bill impact + the slab working   ("code does the maths")
+3. Scenario 10 privacy blocked, show the egress box   ("occupancy never leaves")
+4. Scenario 6  46 C cooling-off blocked, replan       ("code blocks, AI only suggests")
+5. Scenario 11 injection blocked up front
+6. Switch Groq off, run one case: it still works      ("safety doesn't depend on the AI")
+7. Dashboard: show history and replay a past case</div>
+<p>Every step maps to something the statement asks to see: the leak and bill, the slab calculation, occupancy staying local, and the unsafe 46 &deg;C request being blocked.</p>
+<div class="box rem"><b class="t">Remember this</b>Safe &rarr; leak &rarr; privacy &rarr; heat block &rarr; injection &rarr; fallback &rarr; replay. For each, say who decided: code, AI or human.</div>
+<div class="box chk"><b class="t">Check yourself</b>(a) Name the four extra scenarios. (b) Which scenario proves privacy? (c) Which is the &ldquo;safe case&rdquo; and which is the &ldquo;blocked case&rdquo; in your demo?</div>
+</div>
+
+<!-- TOPIC 13 -->
+<div class="topic">
+<h2>*** 13. Honest limits and the questions judges will ask</h2>
+<p>Saying a limit yourself, <b>before</b> a judge finds it, scores better than being caught. It is also the same honesty the system is built on.</p>
+<h3>Say these first</h3>
+<ul>
+<li>The <b>tariff is assumed</b> (secondary web guides, not DEWA). A school may pay a commercial rate. One object to change.</li>
+<li>The <b>38 &deg;C</b> no-cooling-off limit is <b>our guess</b>. The statement's 24 and 27 are &ldquo;e.g.&rdquo;.</li>
+<li>The <b>leak thresholds are ours</b> and tuned on our own synthetic data, so passing all scenarios is <b>not</b> a claim of real-world accuracy.</li>
+<li>The <b>device is simulated</b>: no real hardware.</li>
+<li>The forecast is a <b>naive projection</b>, not a prediction.</li>
+<li>Memory is n8n static data, not a database. <b>One approval at a time.</b></li>
+<li>The reviewer name is <b>typed, not authenticated</b>.</li>
+<li>The audit log stays local and <b>does contain occupancy</b>.</li>
+<li><b>Not built:</b> approval timeout with a safe default, a conflict check between simultaneous requests, Cerebras/Gemini fallback links, tracing, multi-agent (the manual says start simple).</li>
+<li>The local model (1.7B) is weak; the manual suggests a 4B, which did not fit in free memory with Chrome open.</li>
+<li>History: the first plan (written 13:44, before any code) was for a Python build. You chose n8n, and the n8n PLAN.md was rewritten after the build. Do <b>not</b> say &ldquo;plan before code for the n8n build&rdquo;.</li></ul>
+<h3>Likely judge questions</h3>
+<table>
+<tr><th>Question</th><th>Answer</th></tr>
+<tr><td>What does the AI actually do?</td><td>Picks the order of tools from a code-built list, writes the explanation, and after a block proposes one safer setpoint. It decides nothing about safety.</td></tr>
+<tr><td>What if the AI hallucinates?</td><td>Every AI output is validated. A wrong tool pick is overridden, text with an invented number is discarded, a proposed setpoint goes through the same guard. We tested garbage and hostile replies.</td></tr>
+<tr><td>What if Groq is down or rate-limited?</td><td>Groq 120b &rarr; Groq 20b &rarr; local Ollama &rarr; template. We ran the whole thing on Ollama alone, and the safety logic does not use the AI. (Offer to switch it off live.)</td></tr>
+<tr><td>How do you protect privacy?</td><td>One allow-list function builds every cloud payload, an assertion re-checks it, neutral wording, and the page shows what left. n8n runs locally. Scenario 10 shows an export blocked.</td></tr>
+<tr><td>What stops prompt injection?</td><td>The note is scanned before anything sees it, but mainly: text cannot approve or call tools. Approval is a separate form with a named person and the guard is code.</td></tr>
+<tr><td>Why is a human needed?</td><td>The statement requires it for setpoint changes and valve shutoff. Blank name = not approved. A review can never unblock a hard limit.</td></tr>
+<tr><td>Why n8n and Code nodes?</td><td>The manual allows a no-code n8n path and says the paths can be mixed. We put the rules in one code file so they can be unit-tested (155 tests) and audited, instead of scattering them across many canvas nodes.</td></tr>
+<tr><td>Is the leak detector accurate?</td><td>Honest: thresholds are ours, on synthetic data, so we claim no real-world accuracy. It is deterministic, inspectable, and handles awkward cases (cleaners at night, small drips, missing data, disagreeing meters) by saying &ldquo;don't know&rdquo; rather than guessing.</td></tr>
+<tr><td>Where is the bill calculated?</td><td>Plain code in <code>core.js</code>, slab by slab, shown on the page. The tariff is assumed.</td></tr>
+<tr><td>How was it tested?</td><td>155 unit tests; 202 checks running the real generated graph with stubbed AI (including garbage and hostile replies); 83 live checks, plus 72 on Ollama alone; a 42-run quota test with no rate-limit errors.</td></tr>
+<tr><td>What next with more time?</td><td>Verify the tariff, a real device API, a proper database, authenticated approvers, an approval timeout that defaults to the safe state, a conflict check, tuning on real meter data.</td></tr>
+</table>
+<p><b>If you do not know:</b> say &ldquo;I don't know, I would check X&rdquo;. That is better than a confident guess.</p>
+<div class="box rem"><b class="t">Remember this</b>Name the limits yourself: tariff assumed, 38 &deg;C guessed, thresholds ours, device simulated. Know the one-line answer to each judge question above.</div>
+<div class="box chk"><b class="t">Check yourself</b>(a) Name four limits you should volunteer. (b) A judge asks &ldquo;why Code nodes?&rdquo;: answer in two sentences. (c) What do you say about &ldquo;plan before code&rdquo;?</div>
+</div>
+
+<!-- ANSWER KEY -->
+<div class="topic">
+<h2>Answer key</h2>
+<ol>
+<li><b>Topic 1.</b> Offline means the submission must explain itself, since nobody is there to talk. Ask exactly what is submitted at 12:30 (and the other open questions).</li>
+<li><b>Topic 2.</b> Automatic: leak alerts and bill forecasts. Human approval: setpoint changes and main-valve shutoff. Limits: 24 &deg;C occupied, 27 &deg;C unoccupied pre-cooling.</li>
+<li><b>Topic 3.</b> (a) The code blocks it (it breaks a limit). (b) A human.</li>
+<li><b>Topic 4.</b> Validate input, guard check, human approval, write.</li>
+<li><b>Topic 5.</b> (a) A pattern list only catches known phrasing; the real protection is structure: text cannot approve or call tools, the guard is code, and the write goes through one gateway. (b) Stale (limit 2 hours): the feed is untrusted and the run stops, failing closed.</li>
+<li><b>Topic 6.</b> Code overrides it with an allowed tool. After 2 bad picks it switches to the fixed order (also if every planner AI is down).</li>
+<li><b>Topic 7.</b> (a) WATCH (3&ndash;10 L/h, below the 10 L/h leak rule). (b) The building is occupied, so night use is expected. (c) The tariff is assumed (not DEWA-verified), and a school may pay a commercial rate.</li>
+<li><b>Topic 8.</b> (a) <code>unoccupied_over_precool_ceiling</code> (28 is above 27). (b) A new or forgotten field is blocked by default. (c) 38 &deg;C.</li>
+<li><b>Topic 9.</b> (a) Privacy, injection and untrusted-data blocks: the AI cannot fix them, and asking would waste quota. (b) Acknowledge or Escalate, with their name. They cannot unblock a hard limit.</li>
+<li><b>Topic 10.</b> (a) So a bug upstream cannot sneak a bad write through; it is the last line of defence. (b) It counts as not approved. (c) RESET on the console form.</li>
+<li><b>Topic 11.</b> (a) It has its own rate limit, so one model's 429 does not stop everything. (b) The guard, maths and approvals all still work; only the wording becomes a template and the planner uses a fixed order. (c) n8n tried <code>localhost</code> (IPv6) but Ollama listens on IPv4; the fix is <code>127.0.0.1</code>.</li>
+<li><b>Topic 12.</b> (a) 11 injection, 12 corrupt/stale feed, 13 exactly on the limit, 14 two meters disagree. (b) Scenario 10. (c) Safe: scenario 2. Blocked: scenario 6 (or 10).</li>
+<li><b>Topic 13.</b> (a) Any four of: tariff assumed, 38 &deg;C guessed, thresholds ours, simulated device, naive forecast, one approval at a time, typed reviewer name. (b) &ldquo;The guard rules live in one file so the same code can be unit-tested and audited. The manual allows mixing no-code and code.&rdquo; (c) A plan was written before code but for a Python build; the n8n plan was written after the build.</li>
+</ol>
+</div>
+
+<!-- GLOSSARY + CHECKLIST + FILES -->
+<div class="topic">
+<h2>Glossary</h2>
+<table>
+<tr><td><b>Agent</b></td><td>An LLM that decides the next step and calls tools.</td></tr>
+<tr><td><b>LLM</b></td><td>Large language model, the AI that writes and plans with text.</td></tr>
+<tr><td><b>Tool</b></td><td>An ordinary code function the agent may call.</td></tr>
+<tr><td><b>Allow-list</b></td><td>A short list of what is permitted; everything else is refused.</td></tr>
+<tr><td><b>Guard</b></td><td>Code that checks a request against a rule and blocks it.</td></tr>
+<tr><td><b>Setpoint</b></td><td>The AC's target temperature.</td></tr>
+<tr><td><b>Occupied / pre-cooling</b></td><td>People are inside / cooling an empty building before they arrive.</td></tr>
+<tr><td><b>Slab / tariff</b></td><td>A price band / the full price table.</td></tr>
+<tr><td><b>Human-in-the-loop</b></td><td>A person must approve before a risky action.</td></tr>
+<tr><td><b>Prompt injection</b></td><td>Text that tries to trick the AI into breaking its rules.</td></tr>
+<tr><td><b>Fail closed</b></td><td>When unsure or data is bad, refuse rather than allow.</td></tr>
+<tr><td><b>Write gateway</b></td><td>The one function allowed to change state; re-checks, snapshots, rolls back.</td></tr>
+<tr><td><b>Replan</b></td><td>Sending a rejected plan back to the AI for a safer attempt (max 2).</td></tr>
+<tr><td><b>Fallback chain</b></td><td>The ordered backups when one AI fails.</td></tr>
+<tr><td><b>429</b></td><td>&ldquo;Too many requests&rdquo;: a free AI service's rate limit.</td></tr>
+<tr><td><b>Synthetic data</b></td><td>Fake data we generated, with planted tricky cases.</td></tr>
+<tr><td><b>Audit log</b></td><td>A file recording every input, tool call, AI call, decision and approver.</td></tr>
+<tr><td><b>n8n / Ollama</b></td><td>The workflow tool we build in / the program that runs an AI model on the laptop.</td></tr>
+</table>
+<h2 style="margin-top:20px">Friday morning checklist</h2>
+<ul>
+<li>Close Chrome tabs you do not need (the local AI needs the memory). Plug in the charger.</li>
+<li>Start n8n: <code>npx -y n8n@2.48.6 start</code>. Open the console form and the dashboard.</li>
+<li>Run scenarios 2, 1, 10, 6, 11 once. Run <code>node tests/test_core.js</code> (all 155 should pass).</li>
+<li>Test once with Groq switched off to prove the fallback on this laptop. Optionally run <code>node tests/quota_run.js 3</code>.</li>
+<li><b>At the 9:00 briefing ask:</b> (1) What exactly do we submit at 12:30? (2) May we use a pre-built workflow? (3) Which n8n version, and is Ollama installed? (4) Are 24 &deg;C and 27 &deg;C the exact limits, and which tariff?</li>
+<li>Decide who presents and who answers code questions.</li></ul>
+<h2 style="margin-top:20px">Where things are</h2>
+<p>All in <code>workspace/techx_n8n/ecoshield/</code>: <code>README.md</code> (how to run), <code>ARCHITECTURE_NOTE.md</code> (for judges), <code>PLAN.md</code> and <code>CHECKPOINTS.md</code> (history), <code>core.js</code> (all logic), <code>data/</code> (CSVs), the workflow export <code>EcoShield_Agent_export_2026-11-19_v4.json</code> (a copy is on your Desktop; inside n8n it is named <b>EcoShield Agent (Domain 5)</b>), and <code>../MANUAL_CHECKLIST.md</code>.</p>
+</div>
+</body></html>
