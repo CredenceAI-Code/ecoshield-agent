@@ -259,6 +259,8 @@ const st = Object.assign({}, $json); st.trace = st.trace.slice();
 const system = 'You are the explainer inside EcoShield, a water and cooling saving agent for a school. You receive RESULTS that plain code already computed. ' +
   'You do not decide anything, you cannot change anything, and you must never claim that you did. Use ONLY the numbers in the JSON; do not calculate new ones and do not invent any. ' +
   'If tariff_verified is false, say the AED figures use an assumed tariff. If leak_verdict is NOT_RUN, say no analysis was possible and explain the guard_reason. ' +
+  'Write for a school manager: short sentences, plain words, no technical terms such as "guard", "gateway" or "allow-list"; say "safety rule" instead. ' +
+  'Describe rules in words and never quote rule codes that contain underscores. Never suggest overriding, bypassing, relaxing or working around any safety rule, limit or approval, and never hint that a rule might allow the request later. If guard_status is BLOCKED, the only next step is that nothing was changed and a person decides. ' +
   'Reply with JSON only: {"headline":"<=12 words","explanation":"2-3 plain sentences: what was found and what it costs","tip":"one practical next step for a person"}.';
 const s = sanitize(buildOutbound(st.scenario, st.leak, st.bill, st.guard, st.request), 'groq (cloud LLM)');
 const user = JSON.stringify(s.payload);
@@ -293,7 +295,14 @@ if (provider !== 'template') {
       const text = o.headline + ' ' + o.explanation + ' ' + o.tip;
       const nums = (text.replace(/,/g, '').match(/\d+(\.\d+)?/g) || []);
       const bad = nums.filter(n => !allowed.has(n) && !allowed.has(String(Math.round(parseFloat(n)))) && !(Number.isInteger(parseFloat(n)) && parseFloat(n) <= 5));
-      if (bad.length) why = 'AI quoted numbers it was never given: ' + bad.join(', ') + ' (text discarded)'; else llm = { headline: o.headline.trim(), explanation: o.explanation.trim(), tip: o.tip.trim() };
+      const BAD_ADVICE = /\b(overrid\w*|bypass\w*|work[- ]?arounds?|circumvent\w*|get(?:ting)? around|relax\w*|loosen\w*)\b/i;
+      if (bad.length) why = 'AI quoted numbers it was never given: ' + bad.join(', ') + ' (text discarded)';
+      else if (BAD_ADVICE.test(text)) why = 'AI text suggested getting around a safety rule (text discarded)';
+      else {
+        const words = (t) => String(t).replace(/[a-z]+(?:_[a-z]+)+/g, (m) => m.replace(/_/g, ' ')).trim();   // never show rule codes like cooling_off_in_heat
+        llm = { headline: words(o.headline), explanation: words(o.explanation), tip: words(o.tip) };
+        if ((d.guard && d.guard.status === 'BLOCKED') || d.gate === 'REJECT') llm.tip = 'Nothing was changed. A safety rule stopped this request; a person decides what happens next.';
+      }
     } else why = 'AI reply missing fields';
   } catch (e) { why = 'AI reply was not valid JSON'; }
 } else why = 'No AI provider answered (Groq and Ollama both failed or timed out)';

@@ -1,0 +1,169 @@
+{
+ "id": "ProbeLimitsTmp01",
+ "name": "TEMP limits probe (safe to delete)",
+ "nodes": [
+  {
+   "id": "probe-hook",
+   "name": "Probe hook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    -240,
+    0
+   ],
+   "webhookId": "probe-limits-0001-aaaa-bbbbbbbbbbbb",
+   "parameters": {
+    "httpMethod": "GET",
+    "path": "ecoshield-limits-probe",
+    "responseMode": "responseNode",
+    "options": {}
+   }
+  },
+  {
+   "id": "probe-p120",
+   "name": "P120",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.groq.com/openai/v1/chat/completions",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpBearerAuth",
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\"model\": \"openai/gpt-oss-120b\", \"max_tokens\": 8, \"reasoning_effort\": \"low\", \"messages\": [{\"role\": \"user\", \"content\": \"Say ok\"}]}",
+    "options": {
+     "timeout": 20000,
+     "response": {
+      "response": {
+       "fullResponse": true,
+       "neverError": true
+      }
+     }
+    }
+   },
+   "credentials": {
+    "httpBearerAuth": {
+     "id": "cp345zTDAw124tjT",
+     "name": "Groq key"
+    }
+   }
+  },
+  {
+   "id": "probe-p20",
+   "name": "P20",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    240,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.groq.com/openai/v1/chat/completions",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpBearerAuth",
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\"model\": \"openai/gpt-oss-20b\", \"max_tokens\": 8, \"reasoning_effort\": \"low\", \"messages\": [{\"role\": \"user\", \"content\": \"Say ok\"}]}",
+    "options": {
+     "timeout": 20000,
+     "response": {
+      "response": {
+       "fullResponse": true,
+       "neverError": true
+      }
+     }
+    }
+   },
+   "credentials": {
+    "httpBearerAuth": {
+     "id": "cp345zTDAw124tjT",
+     "name": "Groq key"
+    }
+   }
+  },
+  {
+   "id": "probe-collect",
+   "name": "Collect",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    480,
+    0
+   ],
+   "parameters": {
+    "jsCode": "\nconst pick = (name) => {\n  const r = $(name).first().json || {};\n  const h = r.headers || {}, keep = {};\n  Object.keys(h).forEach(k => { if (/^x-ratelimit|^retry-after/i.test(k)) keep[k] = h[k]; });\n  const b = r.body || {};\n  return { status: r.statusCode, rate_limit_headers: keep, error: b.error ? b.error.message : null, tokens_used_by_this_probe: b.usage ? b.usage.total_tokens : null };\n};\nreturn [{ json: { checked_at: new Date().toISOString(), gpt_oss_120b: pick('P120'), gpt_oss_20b: pick('P20') } }];\n"
+   }
+  },
+  {
+   "id": "probe-respond",
+   "name": "Probe respond",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.4,
+   "position": [
+    720,
+    0
+   ],
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ JSON.stringify($json) }}",
+    "options": {}
+   }
+  }
+ ],
+ "connections": {
+  "Probe hook": {
+   "main": [
+    [
+     {
+      "node": "P120",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "P120": {
+   "main": [
+    [
+     {
+      "node": "P20",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "P20": {
+   "main": [
+    [
+     {
+      "node": "Collect",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Collect": {
+   "main": [
+    [
+     {
+      "node": "Probe respond",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "pinData": {},
+ "settings": {
+  "executionOrder": "v1"
+ }
+}

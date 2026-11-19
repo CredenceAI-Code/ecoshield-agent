@@ -13,7 +13,7 @@ const explainOk = (body) => { const o = JSON.parse(body.messages[1].content); re
 const stub = (mode) => async (name, body) => {
   if (name === 'Groq plan') { if (mode.plan === 'fail') return { ok: false, json: { error: 'boom' } }; if (mode.plan === 'garbage') return { ok: true, json: { choices: [{ message: { content: JSON.stringify({ next: 'delete_everything', why: 'because' }) } }] } }; if (mode.plan === 'finishEarly') return { ok: true, json: { choices: [{ message: { content: JSON.stringify({ next: 'finish', why: 'done' }) } }] } }; return goodPlanner(name, body); }
   if (name === 'Ollama plan') { return mode.ollama === 'ok' ? { ok: true, json: { message: { content: '<think>x</think>{"next":"check_safety_guard","why":"local"}' } } } : { ok: false, json: { error: 'ollama down' } }; }
-  if (name === 'Groq explain') return mode.explain === 'fail' ? { ok: false, json: { error: '429' } } : (mode.explain === 'invent' ? { ok: true, json: { choices: [{ message: { content: JSON.stringify({ headline: 'h', explanation: 'It will cost AED 99999 extra.', tip: 't' }) } }] } } : explainOk(body));
+  if (name === 'Groq explain') return mode.explain === 'fail' ? { ok: false, json: { error: '429' } } : (mode.explain === 'bypass' ? { ok: true, json: { choices: [{ message: { content: JSON.stringify({ headline: 'Cooling stays on', explanation: 'The request was stopped.', tip: 'Consider a temporary override if the rule allows it later.' }) } }] } } : mode.explain === 'invent' ? { ok: true, json: { choices: [{ message: { content: JSON.stringify({ headline: 'h', explanation: 'It will cost AED 99999 extra.', tip: 't' }) } }] } } : explainOk(body));
   if (name === 'Ollama explain') return { ok: true, json: { message: { content: JSON.stringify({ headline: 'Local answer', explanation: 'Written by the local model.', tip: 'Review it.' }) }, prompt_eval_count: 5, eval_count: 9 } };
   if (/^Groq 20B/.test(name)) {
     if (!mode.g8) return { ok: false, json: { error: '8b down' } };
@@ -175,6 +175,7 @@ const approve = (who) => () => ({ Decision: 'Approve', Reviewer: who });
     if (name === 'finish too early') ok(st.invalid >= 1 && st.leak && st.guard, '"finish" before the checks is refused by code');
   }
   // explain failure modes
+  await go('RESET - clear the demo memory'); r = await go(label(6), { explain: 'bypass', replan: () => 'garbage' }); ok(!d(r).ai.from_ai && /getting around/.test(d(r).ai.note) && !/temporary override/.test(page(r)), 'AI text that suggests an override is discarded');
   await go('RESET - clear the demo memory'); r = await go(label(1), { explain: 'invent' }); ok(!d(r).ai.from_ai && /never given/.test(d(r).ai.note), 'invented number: AI text discarded');
   await go('RESET - clear the demo memory'); r = await go(label(1), { explain: 'fail' }); ok(d(r).ai.provider === 'ollama' && d(r).ai.from_ai, 'Groq down: Ollama explains');
 
