@@ -1,6 +1,6 @@
 # EcoShield Agent (Domain 5): how it works
 
-*Architecture note for judges. Written 2026-11-19 against the built workflow (v4, 37 nodes, `core.js`) and its tests. Synthetic data, assumed tariff, simulated device. It replaces the EcoWatch note (`../ARCHITECTURE_NOTE.md`), which described the earlier placeholder build.*
+*Architecture note for judges. Written 2026-11-19 against the built workflow (v4, 37 nodes, `core.js`) and its tests. Synthetic data, DEWA published tariff (simplified, updated 2026-11-20), simulated device. It replaces the EcoWatch note (`../ARCHITECTURE_NOTE.md`), which described the earlier placeholder build.*
 
 ## 30-second spoken version
 
@@ -79,7 +79,7 @@ The AI can make the system more cautious or leave it unchanged; it cannot loosen
 
 ## Known limits (say these before a judge finds them)
 
-- The **tariff is assumed** from secondary web guides, not checked against DEWA (every page says so). A school may pay a commercial rate.
+- The **tariff** follows DEWA's published slab tariff page (checked 2026-11-20): electricity slabs, fuel surcharges and 5% VAT. Simplified: no fixed meter service charge, and we assumed the commercial water slabs for a school.
 - The **38 °C heat limit** for "no cooling-off" is our guess; the statement gives 24 °C and 27 °C as examples ("e.g.") and we have not had them confirmed.
 - **Leak thresholds** (10 L/h, 2 nights or a 24-hour run, 01:00-05:00) are our choices, tuned on our own synthetic data.
 - The **device is simulated**; the gateway changes a record, not hardware.

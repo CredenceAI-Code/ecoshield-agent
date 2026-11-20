@@ -71,7 +71,7 @@ function renderPage(d, opt) {
   opt = opt || {};
   const oc = outcome(d), L = d.leak, B = d.bill, G = d.guard || {}, req = d.request || {};
   if (d.special === 'RESET') return shell('EcoShield', '<h1>EcoShield &middot; memory reset</h1><div class="banner ok">' + esc(oc.head) + '</div><p><a href="' + FORM_URL + '">Back to the console</a> &middot; <a href="/webhook/ecoshield-dashboard">Dashboard</a></p>');
-  let h = '<h1>EcoShield &middot; Scenario ' + d.scenario.id + ': ' + esc(d.scenario.name) + '</h1><p class="sub">' + esc(d.scenario.desc) + ' &nbsp;|&nbsp; run ' + esc(d.run_id) + ' &nbsp;|&nbsp; SYNTHETIC data &nbsp;|&nbsp; tariff ' + (B ? (B.tariff_verified ? 'verified' : 'ASSUMED, not verified') : 'n/a') + ' &nbsp;|&nbsp; <a href="/webhook/ecoshield-dashboard">Dashboard</a> &middot; <a href="' + FORM_URL + '">Console</a></p>';
+  let h = '<h1>EcoShield &middot; Scenario ' + d.scenario.id + ': ' + esc(d.scenario.name) + '</h1><p class="sub">' + esc(d.scenario.desc) + ' &nbsp;|&nbsp; run ' + esc(d.run_id) + ' &nbsp;|&nbsp; SYNTHETIC data &nbsp;|&nbsp; tariff ' + (B ? (B.tariff_verified ? 'DEWA published rates (simplified)' : 'ASSUMED, not verified') : 'n/a') + ' &nbsp;|&nbsp; <a href="/webhook/ecoshield-dashboard">Dashboard</a> &middot; <a href="' + FORM_URL + '">Console</a></p>';
   if (opt.replay) h += '<div class="banner warn">Replayed from the log (recorded ' + esc(when(opt.at)) + '). Nothing was re-run: no tools, no AI, no writes.</div>';
   const ai = d.ai;
   const aiCard = card('Explanation (the AI wrote the words; it decided nothing)', ai ? '<p class="tag">' + (ai.from_ai ? 'Written by ' + (ai.provider === 'groq' ? 'Groq gpt-oss-120b (cloud, sanitized data only)' : (ai.provider === 'groq-20b' ? 'Groq gpt-oss-20b (cloud fallback, sanitized data only)' : 'Ollama qwen3:1.7b (local fallback)')) + (ai.tokens ? ' &middot; ' + ai.tokens + ' tokens' : '') : 'No AI text used (' + esc(ai.note) + '). Plain-code template shown instead.') + '</p><p><b>' + esc(ai.text.headline) + '</b></p><p>' + esc(ai.text.explanation) + '</p><p class="mut">Next step: ' + esc(ai.text.tip) + '</p>' : '<p class="mut">No AI explanation: nothing was analysed.</p>', true);
@@ -96,7 +96,7 @@ function renderPage(d, opt) {
     const slabRows = (steps, unit) => steps.map(s => '<tr><td>' + n0(s.from) + (s.to ? ' – ' + n0(s.to) : '+') + '</td><td class="r">' + n0(s.units) + ' ' + unit + '</td><td class="r">' + s.rate + '</td><td class="r">' + n2(s.cost) + '</td></tr>').join('');
     h += det('4 &middot; Bill forecast, slab by slab', '<div class="big">AED ' + n2(B.with_leak.total_aed) + '</div><p class="mut">' + esc(B.method) + '</p>' +
       '<table><tr><th>Electricity slab (kWh)</th><th class="r">Units</th><th class="r">AED/kWh</th><th class="r">AED</th></tr>' + slabRows(E.steps, 'kWh') + '<tr><td colspan="3">Fuel surcharge</td><td class="r">' + n2(E.fuel_surcharge) + '</td></tr></table>' +
-      '<table style="margin-top:8px"><tr><th>Water slab (imp. gal)</th><th class="r">Units</th><th class="r">AED/gal</th><th class="r">AED</th></tr>' + slabRows(W.steps, 'gal') + '</table>' +
+      '<table style="margin-top:8px"><tr><th>Water slab (m&sup3;)</th><th class="r">Units</th><th class="r">AED/m&sup3;</th><th class="r">AED</th></tr>' + slabRows(W.steps, 'm&sup3;') + '<tr><td colspan="3">Fuel surcharge</td><td class="r">' + n2(W.fuel_surcharge) + '</td></tr></table>' + '<p class="mut">Subtotal AED ' + n2(B.with_leak.subtotal_aed) + ' + 5% VAT AED ' + n2(B.with_leak.vat_aed) + '</p>' +
       (B.without_leak ? '<p>Without the leak: AED ' + n2(B.without_leak.total_aed) + '. <b>The leak adds about AED ' + n2(B.leak_bill_impact_aed) + '.</b></p>' : '')); }
   else h += det('4 &middot; Bill forecast', '<p class="mut">Not run.</p>');
   // 5 privacy
@@ -130,7 +130,7 @@ function renderDashboard(mem) {
   hist.forEach(x => { last[x.scenario_id] = x; });
   const approved = hist.filter(x => x.d.review && x.d.review.approved).length, blocked = hist.filter(x => x.tone === 'bad').length;
   const openAlerts = Object.values(mem.devices || {}).reduce((a, dv) => a + (dv.alerts || []).filter(al => al.open).length, 0);
-  let h = '<h1>EcoShield &middot; dashboard</h1><p class="sub">Synthetic data &middot; assumed tariff &middot; state is kept between runs and restarts &middot; <a href="/webhook/ecoshield-dashboard">refresh</a></p>';
+  let h = '<h1>EcoShield &middot; dashboard</h1><p class="sub">Synthetic data &middot; DEWA published tariff (simplified) &middot; state is kept between runs and restarts &middot; <a href="/webhook/ecoshield-dashboard">refresh</a></p>';
   h += '<div class="tiles"><div class="card tile"><b>' + (mem.runs || 0) + '</b>runs logged</div><div class="card tile"><b>' + approved + '</b>approved by a person</div><div class="card tile"><b>' + blocked + '</b>blocked or rejected</div><div class="card tile"><b>' + openAlerts + '</b>open leak alerts</div></div>';
   h += '<p><a href="' + FORM_URL + '">Open the console</a> &middot; <a href="' + FORM_URL + '?Scenario=' + encodeURIComponent('UNDO - roll back the last applied change') + '">Undo the last change</a> (' + (mem.undo || []).length + ' on the undo stack) &middot; <a href="' + FORM_URL + '?Scenario=' + encodeURIComponent('RESET - clear the demo memory') + '">Reset demo memory</a></p>';
   h += '<div class="grid">';

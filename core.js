@@ -1,14 +1,18 @@
 // EcoShield core logic. ONE source of truth: tests run this file in Node, and the n8n generator pastes the same text into Code nodes.
-// Everything here is plain code. No LLM, no network. SYNTHETIC DATA, ASSUMED TARIFF (unverified, see TARIFF).
+// Everything here is plain code. No LLM, no network. SYNTHETIC DATA; tariff = DEWA's published rates (see TARIFF).
 
 const LIMITS = { OCCUPIED_MAX_C: 24, UNOCCUPIED_PRECOOL_MAX_C: 27, HEAT_OUTDOOR_C: 38, LEAK_MIN_LPH: 10, WATCH_MIN_LPH: 3, LEAK_NIGHTS: 2, LEAK_RUN_HOURS: 24, NIGHT_FIRST: 1, NIGHT_LAST: 5, GAP_LIMIT: 0.2, MIN_NAME_LEN: 2 };
 const MONTH_DAYS = 30, TODAY = 22;          // day 1 is a Monday; days 6,7,13,14,20,21,27,28 are weekends; day 22 is a Monday
 const L_PER_IG = 4.54609;
-// ASSUMED tariff from secondary web guides, NOT checked against DEWA. Water tiers conflict between sources. A school may pay a commercial rate.
+// Tariff: DEWA published slab tariff (https://www.dewa.gov.ae/en/consumer/billing/slab-tariff, read 2026-11-20).
+// Electricity (residential/commercial): 0-2000 / 2001-4000 / 4001-6000 / 6001+ kWh = 0.23 / 0.28 / 0.32 / 0.38 AED. Fuel surcharge Nov 2026: 0.060 AED/kWh.
+// Water, COMMERCIAL slabs (a school building): 0-45 / 45-91 / 91+ m3 = 7.70 / 8.80 / 10.12 AED/m3. Fuel surcharge Nov 2026: 1.10 AED/m3. 5% VAT on all.
+// Simplified: the fixed meter service charge is left out, and the commercial category is our choice for a school.
 const TARIFF = {
-  verified: false, source: 'secondary web guides, 2026-11-19; unverified',
-  electricity: { unit: 'kWh', slabs: [{ upto: 2000, rate: 0.23 }, { upto: 4000, rate: 0.28 }, { upto: 6000, rate: 0.32 }, { upto: Infinity, rate: 0.38 }], fuel_surcharge_per_kwh: 0.065 },
-  water: { unit: 'imperial gallon', slabs: [{ upto: 6000, rate: 0.03 }, { upto: 12000, rate: 0.035 }, { upto: Infinity, rate: 0.04 }] }
+  verified: true, source: 'DEWA slab tariff page, read 2026-11-20 (commercial water slabs, Nov 2026 surcharges, 5% VAT; meter service charge left out)',
+  electricity: { unit: 'kWh', slabs: [{ upto: 2000, rate: 0.23 }, { upto: 4000, rate: 0.28 }, { upto: 6000, rate: 0.32 }, { upto: Infinity, rate: 0.38 }], fuel_surcharge_per_kwh: 0.060 },
+  water: { unit: 'm3', slabs: [{ upto: 45, rate: 7.70 }, { upto: 91, rate: 8.80 }, { upto: Infinity, rate: 10.12 }], fuel_surcharge_per_m3: 1.10 },
+  vat_rate: 0.05
 };
 
 // ---------- scenarios (the 10 demo cases) ----------
@@ -95,9 +99,11 @@ function detectLeak(rows) {
 }
 function slabCost(units, slabs) { let left = units, from = 0; const steps = []; for (const s of slabs) { if (left <= 0) break; const room = s.upto - from, u = Math.min(left, room); steps.push({ from, to: s.upto === Infinity ? null : s.upto, units: Math.round(u * 10) / 10, rate: s.rate, cost: Math.round(u * s.rate * 100) / 100 }); left -= u; from = s.upto; } return { steps, total: Math.round(steps.reduce((a, s) => a + s.cost, 0) * 100) / 100 }; }
 function billFor(litres, kwh) {
-  const ig = litres / L_PER_IG, w = slabCost(ig, TARIFF.water.slabs), e = slabCost(kwh, TARIFF.electricity.slabs);
-  const fuel = Math.round(kwh * TARIFF.electricity.fuel_surcharge_per_kwh * 100) / 100;
-  return { water: { litres: Math.round(litres), imperial_gallons: Math.round(ig), steps: w.steps, cost: w.total }, electricity: { kwh: Math.round(kwh), steps: e.steps, fuel_surcharge: fuel, cost: Math.round((e.total + fuel) * 100) / 100 }, total_aed: Math.round((w.total + e.total + fuel) * 100) / 100 };
+  const m3 = litres / 1000, w = slabCost(m3, TARIFF.water.slabs), e = slabCost(kwh, TARIFF.electricity.slabs);
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const fuelW = r2(m3 * TARIFF.water.fuel_surcharge_per_m3), fuelE = r2(kwh * TARIFF.electricity.fuel_surcharge_per_kwh);
+  const subtotal = r2(w.total + fuelW + e.total + fuelE), vat = r2(subtotal * TARIFF.vat_rate);
+  return { water: { litres: Math.round(litres), cubic_metres: Math.round(m3 * 10) / 10, steps: w.steps, fuel_surcharge: fuelW, cost: r2(w.total + fuelW) }, electricity: { kwh: Math.round(kwh), steps: e.steps, fuel_surcharge: fuelE, cost: r2(e.total + fuelE) }, subtotal_aed: subtotal, vat_aed: vat, total_aed: r2(subtotal + vat) };
 }
 function forecastBill(rows, leak, nowHour) {
   const sum = (f) => rows.reduce((a, r) => a + (r[f] || 0), 0);
@@ -163,7 +169,7 @@ function validateMeterRows(rows, now) {
 }
 
 // ---------- guard 1: privacy filter (allow-list, not block-list) ----------
-const ALLOWED_OUT = ['scenario_id', 'scenario_name', 'leak_verdict', 'est_leak_lph', 'est_leak_litres_per_day', 'leak_bill_impact_aed', 'bill_total_aed', 'water_cost_aed', 'electricity_cost_aed', 'elec_slabs_used', 'water_gallons', 'electricity_kwh', 'tariff_verified', 'guard_rule', 'guard_status', 'guard_reason', 'request_type', 'requested_setpoint_c', 'outdoor_c', 'task', 'steps_used', 'tools_done', 'runnable', 'data_ok', 'open_alert', 'earlier_decision', 'original_setpoint_c', 'attempt', 'failed_proposals'];
+const ALLOWED_OUT = ['scenario_id', 'scenario_name', 'leak_verdict', 'est_leak_lph', 'est_leak_litres_per_day', 'leak_bill_impact_aed', 'bill_total_aed', 'water_cost_aed', 'electricity_cost_aed', 'elec_slabs_used', 'water_m3', 'electricity_kwh', 'tariff_verified', 'guard_rule', 'guard_status', 'guard_reason', 'request_type', 'requested_setpoint_c', 'outdoor_c', 'task', 'steps_used', 'tools_done', 'runnable', 'data_ok', 'open_alert', 'earlier_decision', 'original_setpoint_c', 'attempt', 'failed_proposals'];
 const OCC_HINT = /occup|presence|room|schedule|people|empty/i;
 function sanitize(payload, destination) {
   const kept = {}, stripped = [];
@@ -184,7 +190,7 @@ function buildOutbound(scn, leak, bill, guard, req) {
   return {
     scenario_id: scn.id, leak_verdict: leak ? leak.verdict : 'NOT_RUN', est_leak_lph: leak ? (leak.est_lph || 0) : 0, est_leak_litres_per_day: leak ? (leak.est_litres_per_day || 0) : 0,
     leak_bill_impact_aed: bill ? bill.leak_bill_impact_aed : null, bill_total_aed: w ? w.total_aed : null, water_cost_aed: w ? w.water.cost : null, electricity_cost_aed: w ? w.electricity.cost : null,
-    elec_slabs_used: w ? w.electricity.steps.length : null, water_gallons: w ? w.water.imperial_gallons : null, electricity_kwh: w ? w.electricity.kwh : null, tariff_verified: TARIFF.verified,
+    elec_slabs_used: w ? w.electricity.steps.length : null, water_m3: w ? w.water.cubic_metres : null, electricity_kwh: w ? w.electricity.kwh : null, tariff_verified: TARIFF.verified,
     guard_rule: rule, guard_status: guard.status, guard_reason: PUBLIC_REASON[rule] || 'See guard status.', request_type: neutralReq(req.type),
     requested_setpoint_c: req.setpoint_c === undefined ? null : req.setpoint_c, task: 'Explain these already-computed results to a facilities manager.'
   };

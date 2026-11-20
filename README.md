@@ -1,6 +1,6 @@
 # EcoShield (Domain 5) in local n8n: v3, what exists and how to run it
 
-Built 2026-11-19. Synthetic data, **assumed** tariff. Everything below was run, not just written.
+Built 2026-11-19. Synthetic meter data; tariff = DEWA's published rates (checked 2026-11-20, simplified). Everything below was run, not just written.
 
 ## Run it
 - Console form: `http://localhost:5678/form/be2bf8f1-b886-4585-950c-82bcc0648882` (pick a scenario; optional operator note).
@@ -34,7 +34,7 @@ Built 2026-11-19. Synthetic data, **assumed** tariff. Everything below was run, 
 1-10 are the statement's ten. 11 (prompt injection in an automation note), 12 (corrupt and stale feed), 13 (setpoint exactly on the 27 C limit: allowed) and 14 (two water meters disagree: feed untrusted) are bonus edge cases I added. In 4, 5, 8, 9 the routine request is a 23 C setpoint (24 C would be a no-op, which the system now correctly recognises as "no change needed").
 
 ## NOT settled, do not present as fact
-- **Tariff** is from secondary web guides, not DEWA; water tiers conflict between sources; a school may pay a commercial rate. The pages say "ASSUMED, not verified".
+- **Tariff** (updated 2026-11-20): checked against DEWA's own slab-tariff page (dewa.gov.ae/en/consumer/billing/slab-tariff). Electricity slabs 0.23/0.28/0.32/0.38 AED per kWh with a 0.060 fuel surcharge; water on the COMMERCIAL slabs (7.70/8.80/10.12 AED per m3, 1.10 surcharge); 5% VAT. Simplified: the fixed meter service charge is left out, and treating the school as a commercial customer is our choice (residential slabs differ). Before this change the tariff was an unverified guess (old water rates and a 0.065 surcharge); the old version is the git tag `before-dewa-tariff-2026-11-20`.
 - **38 C** cooling-off limit is my guess. The statement gives 24 C and 27 C as "e.g.". Ask the organisers.
 - Leak thresholds (10 L/h, 2 flagged nights or a 24 h run, window 01:00-05:00) are my choices, tuned on my own synthetic data, so passing all scenarios is not an accuracy claim.
 - Bill forecast is a naive projection, not a prediction.
