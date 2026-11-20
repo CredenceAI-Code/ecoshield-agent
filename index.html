@@ -61,7 +61,7 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
   <div class="eyebrow">TECHX DUBAI'26 · AI AGENT ARENA · DOMAIN 5 · CREDENCE HIGH SCHOOL</div>
   <h1>EcoShield live demo</h1>
   <p class="tag">AI talks, code decides, a human approves.</p>
-  <div class="note"><b>What runs here:</b> EcoShield's real <code>core.js</code> (the same file our tests run) in your browser, on <b>synthetic</b> data: leak detector, bill forecaster on DEWA's published tariff (simplified), heat-safety guard, privacy filter, input checks and the single write gateway. <b>What does not:</b> the AI planner and the AI-written explanation, which run in our local n8n workflow (screenshots are in the presentation). Nothing on this page calls an AI or sends data anywhere.</div>
+  <div class="note"><b>What runs here:</b> EcoShield's real <code>core.js</code> (the same file our tests run) in your browser, on <b>synthetic</b> data: leak detector, evidence strength score (0 to 100) that sets how much the agent may do alone, bill forecaster on DEWA's published tariff (simplified), heat-safety guard, offline-room-sensor handling, privacy filter, input checks and the single write gateway. <b>What does not:</b> the AI planner and the AI-written explanation, which run in our local n8n workflow (screenshots are in the presentation). Nothing on this page calls an AI or sends data anywhere.</div>
 </header>
 <div class="wrap">
   <aside class="list" id="list"></aside>
@@ -96,7 +96,16 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
     var out = run_leak_and_bill_forecaster(scn.id, rec.rows);
     var state = { occupied: rec.now.occupied, outdoor_c: rec.now.outdoor_c };
     var guard = heatGuard(req, Object.assign({}, state, { device: device }));
-    return { stage: 'ok', nc: nc, feed: feed, leak: out.leak, bill: out.bill, guard: guard, state: state };
+    return { stage: 'ok', nc: nc, feed: feed, leak: out.leak, bill: out.bill, evidence: out.evidence, autonomy: autonomyFor(out.evidence), guard: guard, state: state };
+  }
+
+  var roomOffline = '', roomTarget = '';   // HS-5.5 inputs: which room sensor is offline, and the target for unoccupied rooms
+  var LEAKISH = ['LEAK', 'WATCH', 'INSUFFICIENT_DATA'];
+  function heldPending(p) { return !!(p.leak && LEAKISH.indexOf(p.leak.verdict) >= 0 && p.autonomy && p.autonomy.alert === 'approve' && !alerted[curId]); }
+  function raiseAlert(rec, p, kind, text) {   // the same write gateway the n8n agent uses (snapshot kept, can be undone)
+    var gw = writeGateway({ type: 'RAISE_ALERT', alert: p.leak.verdict + ' in scenario ' + rec.scenario.id }, p.state, device);
+    if (gw.ok) { history.push(gw.before); device = devices[curId] = gw.device; alerted[rec.scenario.id] = true; log(kind, text); }
+    return gw.ok;
   }
 
   function badge(status) {
@@ -119,7 +128,7 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
       b.addEventListener('click', function () { curId = +b.getAttribute('data-id'); curNote = ''; playground = null; lastResult = ''; render(); });
     });
     $('#setRead').addEventListener('click', function () { (edits[curId] = edits[curId] || []).push({ day: +$('#eDay').value, hour: +$('#eHr').value, v: +$('#eVal').value }); log('reading', 'Typed reading: day ' + $('#eDay').value + ', hour ' + $('#eHr').value + ', ' + $('#eVal').value + ' L/h.'); render(); });
-    $('#resetDev').addEventListener('click', function () { edits = {}; devices = {}; hist = {}; alerted = {}; lastResult = ''; log('reset', 'All simulated buildings reset to their defaults.'); render(); });
+    $('#resetDev').addEventListener('click', function () { edits = {}; devices = {}; hist = {}; alerted = {}; lastResult = ''; roomOffline = ''; roomTarget = ''; log('reset', 'All simulated buildings reset to their defaults.'); render(); });
   }
 
   function nightChart(leak) {
@@ -174,6 +183,39 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
     return h + '</div>';
   }
 
+  function sectionEvidence(p) {
+    var h = '<div class="card' + (p.evidence ? '' : ' grey') + '"><h3><span>3b</span>Evidence strength and autonomy <span class="dim" style="font-weight:400">(plain code; the AI never sees the score)</span></h3>';
+    if (!p.evidence) return h + '<div class="mut">Not run.</div></div>';
+    var e = p.evidence, a = p.autonomy, cls = e.level === 'HIGH' ? 'b-ok' : e.level === 'MEDIUM' ? 'b-warn' : 'b-bad';
+    h += '<div class="big">' + e.score + ' <span class="mut" style="font-size:15px;font-weight:400">/ 100 evidence strength</span> <span class="badge ' + cls + '">' + esc(a.level) + '</span></div>';
+    h += '<div style="margin-top:6px">' + esc(a.text) + '</div>';
+    if (e.reasons.length) {
+      h += '<table><tr><th>Why points were lost</th><th class="r">Points</th></tr>';
+      e.reasons.forEach(function (r) { h += '<tr><td>' + esc(r.why) + '</td><td class="r">-' + r.points + '</td></tr>'; });
+      h += '</table>';
+    } else h += '<div class="mut">No deductions: the feed is complete and the signal is clear.</div>';
+    return h + '<div class="dim">' + esc(e.bands) + '. HIGH raises the alert automatically, MEDIUM holds it for a named person, LOW raises nothing. The weights and cut-offs are our own design, not calibrated on real buildings.</div></div>';
+  }
+
+  function sectionRooms() {
+    var h = '<div class="card"><h3><span>★</span>Room setpoints <span class="dim" style="font-weight:400">(HS-5.5: a room with an offline sensor is assumed occupied and hot)</span></h3>';
+    h += '<div class="mut">Five rooms. Occupied rooms stay at ' + LIMITS.OCCUPIED_MAX_C + ' °C. Empty rooms with a working sensor may be proposed the target, up to ' + LIMITS.UNOCCUPIED_PRECOOL_MAX_C + ' °C, and a person must approve. Try taking Exam Hall 2 offline.</div>';
+    h += '<div class="row"><div><label>Offline room sensor</label><select id="rmOff"><option value="">none (all sensors online)</option>';
+    ROOMS.forEach(function (r) { h += '<option value="' + esc(r.room) + '"' + (roomOffline === r.room ? ' selected' : '') + '>' + esc(r.room) + '</option>'; });
+    h += '</select></div><div><label>Raise all unoccupied rooms to (°C)</label><input type="text" id="rmTgt" value="' + esc(roomTarget) + '" placeholder="e.g. 27"></div></div>';
+    h += '<div style="margin-top:8px"><button class="act" id="rmGo">Plan room setpoints</button></div>';
+    if (roomTarget !== '' && isFinite(+roomTarget)) {
+      var plan = planRoomSetpoints(+roomTarget, roomOffline ? [roomOffline] : []);
+      h += '<table style="margin-top:8px"><tr><th>Room</th><th>Sensor</th><th>Status</th><th class="r">Setpoint</th><th>Why</th></tr>';
+      plan.forEach(function (r) {
+        var c = r.status === 'PROPOSED' ? 'b-ok' : r.status === 'BLOCKED' ? 'b-bad' : 'b-warn';
+        h += '<tr><td><b>' + esc(r.room) + '</b></td><td>' + (r.sensor === 'OFFLINE' ? '<span class="chip no">OFFLINE</span>' : 'ok') + '</td><td><span class="badge ' + c + '">' + esc(r.status) + '</span></td><td class="r">' + (r.setpoint_c === null ? '-' : r.setpoint_c + ' °C') + '</td><td>' + esc(r.reason) + '</td></tr>';
+      });
+      h += '</table>';
+    } else if (roomTarget !== '') h += '<div class="mut" style="margin-top:8px">Enter a number, for example 27.</div>';
+    return h + '</div>';
+  }
+
   function sectionGuard(p, rec) {
     var req = rec.request, g = p.guard;
     var h = '<div class="card"><h3><span>4</span>Safety guard <span class="dim" style="font-weight:400">(code only, the AI cannot override it)</span></h3>';
@@ -220,15 +262,24 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
     var req = rec.request, g = p.guard;
     var h = '<div class="card"><h3><span>6</span>Human approval and the single write gateway</h3>';
     // automatic, low-risk alert for leak-type verdicts
-    if (p.leak && ['LEAK', 'WATCH', 'INSUFFICIENT_DATA'].indexOf(p.leak.verdict) >= 0) {
-      if (!alerted[rec.scenario.id]) {
-        var gw = writeGateway({ type: 'RAISE_ALERT', alert: p.leak.verdict + ' in scenario ' + rec.scenario.id }, p.state, device);
-        if (gw.ok) { history.push(gw.before); device = devices[curId] = gw.device; alerted[rec.scenario.id] = true; log('auto', 'Leak alert raised automatically through the write gateway (scenario ' + rec.scenario.id + ', ' + p.leak.verdict + ').'); }
-      }
-      h += '<div class="chips"><span class="chip ok">leak alert raised automatically (low risk, logged, can be undone)</span></div>';
+    // the evidence score decides how much the agent may do alone: HIGH raises it, MEDIUM holds it for a named person, LOW only watches
+    var held = false;
+    if (p.leak && LEAKISH.indexOf(p.leak.verdict) >= 0) {
+      var au = p.autonomy;
+      if (alerted[rec.scenario.id]) h += '<div class="chips"><span class="chip ok">leak alert raised (low risk, logged, can be undone)</span></div>';
+      else if (au.alert === 'auto') {
+        raiseAlert(rec, p, 'auto', 'Leak alert raised automatically through the write gateway (scenario ' + rec.scenario.id + ', ' + p.leak.verdict + ', evidence ' + p.evidence.score + ' HIGH).');
+        h += '<div class="chips"><span class="chip ok">evidence ' + p.evidence.score + ' (HIGH): leak alert raised automatically (low risk, logged, can be undone)</span></div>';
+      } else if (au.alert === 'approve') {
+        held = true;
+        h += '<div class="chips"><span class="chip">evidence ' + p.evidence.score + ' (MEDIUM): leak alert HELD until a named person approves it</span></div>';
+      } else h += '<div class="chips"><span class="chip no">evidence ' + p.evidence.score + ' (' + esc(au.level) + '): no alert raised, logged as insufficient evidence and watched</span></div>';
+    }
+    if (held && g.status !== 'NEEDS_APPROVAL') {
+      h += '<div class="row"><div><label>Reviewer name for the held alert (goes in the audit trail)</label><input type="text" id="revA" placeholder="Your full name"></div><div><label>&nbsp;</label><button class="act" id="apprA">Approve alert</button></div></div>';
     }
     if (g.status === 'NEEDS_APPROVAL') {
-      h += '<div>A person must approve: <b>' + esc(req.type.replace(/_/g, ' ').toLowerCase()) + (req.setpoint_c !== undefined ? ' to ' + req.setpoint_c + ' °C' : '') + '</b>. Nothing changes unless a name is typed.</div>';
+      h += '<div>A person must approve: <b>' + esc(req.type.replace(/_/g, ' ').toLowerCase()) + (req.setpoint_c !== undefined ? ' to ' + req.setpoint_c + ' °C' : '') + '</b>. Nothing changes unless a name is typed.' + (held ? ' Approving also raises the held leak alert first.' : '') + '</div>';
       h += '<div class="row"><div><label>Reviewer name (goes in the audit trail)</label><input type="text" id="rev" placeholder="Your full name"></div><div><label>&nbsp;</label><button class="act" id="appr">Approve</button> <button class="act alt" id="rej">Reject</button></div></div>';
     } else if (g.status === 'NO_CHANGE') h += '<div class="mut">Nothing to approve: that state already holds.</div>';
     else if (g.status === 'BLOCKED') h += '<div class="mut">Blocked by a hard rule, so there is nothing to approve. A person cannot unblock a hard limit.</div>';
@@ -251,7 +302,7 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
     var note = curNote !== '' ? curNote : (scn.note || '');
     var p = pipeline(rec, note);
     var h = '<div class="card"><h3>' + esc(scn.id + '. ' + scn.name) + '</h3><div class="mut">' + esc(scn.desc) + '</div><div class="chips"><span class="chip">day ' + rec.now.day + ', ' + String(rec.now.hour).padStart(2, '0') + ':00</span><span class="chip">' + (rec.now.occupied ? 'people inside' : 'building empty') + '</span><span class="chip">' + rec.now.outdoor_c + ' °C outside</span><span class="chip">synthetic data</span></div></div>';
-    h += sectionInput(p, note) + sectionLeak(p) + sectionBill(p) + sectionGuard(p, rec) + sectionPrivacy(p, rec) + sectionApproval(p, rec);
+    h += sectionInput(p, note) + sectionLeak(p) + sectionBill(p) + sectionEvidence(p) + sectionGuard(p, rec) + sectionRooms() + sectionPrivacy(p, rec) + sectionApproval(p, rec);
     h += '<div class="card"><h3><span>7</span>Audit trail <span class="dim" style="font-weight:400">(this browser session; the n8n agent writes every step to a file)</span></h3><div class="log" id="audit"></div></div>';
     $('#main').innerHTML = h;
     renderAudit();
@@ -274,6 +325,20 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
       ap.addEventListener('click', function () { decide('Approve'); });
       rj.addEventListener('click', function () { decide('Reject'); });
     }
+    var apA = $('#apprA');
+    if (apA) apA.addEventListener('click', function () {
+      var rv = applyReview('Approve', $('#revA').value, '');
+      if (!rv.approved) { lastResult = '<span class="badge b-neutral">NOT APPROVED</span> ' + esc(rv.note || 'No reviewer name, so the alert stays held.'); log('review', 'Held alert not approved: no reviewer name. Nothing raised.'); render(); return; }
+      var okA = raiseAlert(rec, p, 'write', 'Held leak alert approved by ' + rv.reviewer + ' and raised through the write gateway.');
+      lastResult = okA ? '<span class="badge b-ok">APPLIED</span> Held alert approved by ' + esc(rv.reviewer) + ' and raised through the single write gateway (snapshot kept, can be undone).' : '<span class="badge b-bad">NOT RAISED</span> The write gateway refused it.';
+      render();
+    });
+    var rmGo = $('#rmGo');
+    rmGo.addEventListener('click', function () {
+      roomOffline = $('#rmOff').value; roomTarget = $('#rmTgt').value.trim();
+      log('rooms', 'Room setpoints planned' + (roomOffline ? ' with the ' + roomOffline + ' sensor offline' : '') + (roomTarget !== '' ? ', target ' + roomTarget + ' C.' : '.'));
+      render();
+    });
     function decide(d) {
       var rv = applyReview(d, $('#rev').value, '');
       if (!rv.approved) {
@@ -281,6 +346,7 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
         log('review', d === 'Approve' ? 'Approval ignored: no reviewer name. Nothing changed.' : 'Rejected by ' + rv.reviewer + '. Nothing changed.');
         render(); return;
       }
+      if (heldPending(p)) raiseAlert(rec, p, 'write', 'Held leak alert approved by ' + rv.reviewer + ' and raised through the write gateway (before the request).');
       var gw = writeGateway(rec.request, p.state, device);
       if (gw.ok) {
         history.push(gw.before); device = devices[curId] = gw.device;
