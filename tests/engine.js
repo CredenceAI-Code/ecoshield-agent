@@ -4,7 +4,10 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 function makeEngine(workflow, opts) {
   opts = opts || {};
-  const nodes = {}; workflow.nodes.forEach(n => { nodes[n.name] = n; });
+  // Nodes are named "1) Console form" in n8n; the tests use the plain names, so every name is stripped of its "N) " prefix here.
+  const strip = (s) => String(s).replace(/^\d+b?\) /, '');
+  const nodes = {}; workflow.nodes.forEach(n => { nodes[strip(n.name)] = n; });
+  const connOf = {}; Object.keys(workflow.connections).forEach(k => { connOf[strip(k)] = (workflow.connections[k].main || []).map(port => port.map(c => ({ ...c, node: strip(c.node) }))); });
   const sd = opts.staticData || {};                    // persistent workflow static data ("memory")
   const exprBody = (e) => String(e).replace(/^=\s*\{\{\s*/, '').replace(/\s*\}\}\s*$/, '');
   const evalExpr = (e, ctx) => new Function('$json', '$', 'return (' + exprBody(e) + ');')(ctx.$json, ctx.$);
@@ -13,7 +16,7 @@ function makeEngine(workflow, opts) {
     o = o || {};
     const audit = [], httpLog = [];                       // per run: audit lines written, and every body that would have left the laptop
     const last = {}, outputs = {}, steps = [];
-    const $ = (name) => ({ first: () => (last[name] || [{ json: {} }])[0], all: () => last[name] || [], last: () => (last[name] || [{ json: {} }]).slice(-1)[0] });
+    const $ = (raw) => { const name = strip(raw); return { first: () => (last[name] || [{ json: {} }])[0], all: () => last[name] || [], last: () => (last[name] || [{ json: {} }]).slice(-1)[0] }; };
     const queue = [{ node: triggerName, item: { json } }];
     let response = null, guard = 0;
     while (queue.length) {
@@ -46,7 +49,7 @@ function makeEngine(workflow, opts) {
         response = { page: evalExpr(n.parameters.responseBody, ctx) }; outs = [[]];
       } else throw new Error('engine: unsupported node type ' + n.type + ' (' + name + ')');
       last[name] = outs.flat();
-      const conn = (workflow.connections[name] || {}).main || [];
+      const conn = connOf[name] || [];
       outs.forEach((arr, idx) => (conn[idx] || []).forEach(c => arr.forEach(it => queue.push({ node: c.node, item: it }))));
     }
     return { steps, last, response, audit: audit.slice(), httpLog: httpLog.slice() };

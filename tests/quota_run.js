@@ -2,7 +2,7 @@
 // Run: node tests/quota_run.js [rounds]. Needs n8n running with the normal (Groq + Ollama) workflow published.
 const fs = require('fs'), path = require('path');
 const w = require('../ecoshield_workflow.json'), C = require('../core.js');
-const formId = w.nodes.find(n => n.name === 'Console form').webhookId, FORM = 'http://localhost:5678/form/' + formId;
+const formId = w.nodes.find(n => /Console form/.test(n.name)).webhookId, FORM = 'http://localhost:5678/form/' + formId;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const post = async (url, f) => { const fd = new FormData(); Object.entries(f).forEach(([k, v]) => fd.append(k, v)); return (await fetch(url, { method: 'POST', body: fd })).text(); };
 const get = async (u) => { try { return await (await fetch(u, { signal: AbortSignal.timeout(25000) })).text(); } catch (e) { return ''; } };

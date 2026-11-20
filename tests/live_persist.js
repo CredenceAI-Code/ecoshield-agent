@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path');
 const w = require('../ecoshield_workflow.json');
 const C = require('../core.js');
-const formId = w.nodes.find(n => n.name === 'Console form').webhookId;
+const formId = w.nodes.find(n => /Console form/.test(n.name)).webhookId;
 const FORM = 'http://localhost:5678/form/' + formId, DASH = 'http://localhost:5678/webhook/ecoshield-dashboard';
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const post = async (url, fields) => { const f = new FormData(); Object.entries(fields).forEach(([k, v]) => f.append(k, v)); return (await fetch(url, { method: 'POST', body: f })).text(); };

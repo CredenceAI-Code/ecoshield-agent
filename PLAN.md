@@ -40,7 +40,7 @@ Source documents: the emailed problem statement (`../STATEMENT_ANALYSIS.md`) and
 |---|---|
 | `core.js` | ALL decision logic, plain code, no network: scenarios, synthetic data generator, leak detector, slab bill forecaster, note and feed validators, privacy `sanitize`, `heatGuard`, `applyReview`, `writeGateway`, planner allow-list (`runnable`, `deterministicNext`, `planView`), replan loop (`needsReplan`, `replanView`, `parseReplan`, `applyReplan`, `recordReview`), memory helpers. Run by tests in Node; pasted verbatim into n8n Code nodes. |
 | `page_js.js` | HTML builders for the result page and dashboard (`outcome`, `renderPage`, `renderDashboard`). |
-| `make_ecoshield_workflow.py` | Generates `ecoshield_workflow.json` (37 nodes, deterministic ids so the form URL never changes). `ECO_OLLAMA_ONLY=1` writes `tests/ollama_only_workflow.json` with Groq pointed at a dead port. |
+| `make_ecoshield_workflow.py` | Generates `ecoshield_workflow.json` (38 nodes, deterministic ids so the form URL never changes). `ECO_OLLAMA_ONLY=1` writes `tests/ollama_only_workflow.json` with Groq pointed at a dead port. |
 | `ecoshield_workflow.json`, `EcoShield_Agent_export_*_v*.json` | The importable workflow and dated copies. |
 | `export_csv.js`, `data/` | Synthetic dataset for judges: `smart_resource_meters.csv` (hourly rows, 14 scenarios), `scenarios.csv` (with expected verdict and guard rule per scenario), `sample_audit_excerpt.jsonl`. |
 | `tests/test_core.js` | Unit tests of every function in `core.js`, including thresholds and boundaries. |
@@ -97,5 +97,5 @@ See `../MANUAL_CHECKLIST.md` for the item-by-item table against all 33 pages. Re
 | One injection scenario in a text field (section 7) | **Kept**: scenario 11 and the operator note |
 | LLM-proposed pre-cooling setpoint checked by the guard (stretch) | **Partly**: the replan loop has the AI propose setpoints that the guard checks |
 | Phases 1 to 6 with a human checkpoint after each, and hand-off prompts | **Not followed as written**: built in a different order on a different platform; the prompts in section 5 above are new and were never run as a hand-off |
-| pytest unit tests | **Changed**: Node test files, 155 unit, 202 graph-sim, 83 live |
+| pytest unit tests | **Changed**: Node test files, 176 unit, 221 graph-sim, 83 live |
 | Streamlit 8-panel dashboard | **Changed**: per-run HTML page (cards) and a dashboard webhook with replay |

@@ -1,6 +1,8 @@
 # EcoShield Agent (Domain 5): how it works
+**On the n8n canvas every node name starts with its number, for example `1) Console form`, `2) Validate input`, `19b) Cloud call allowed?`, `37) Respond HTML`. The numbers match the node numbers in the Node Notes. This document uses the plain names.**
 
-*Architecture note for judges. Written 2026-11-19 against the built workflow (v4, 37 nodes, `core.js`) and its tests. Synthetic data, DEWA published tariff (simplified, updated 2026-11-20), simulated device. It replaces the EcoWatch note (`../ARCHITECTURE_NOTE.md`), which described the earlier placeholder build.*
+
+*Architecture note for judges. Written 2026-11-19 against the built workflow (v6, 38 nodes, `core.js`) and its tests. Synthetic data, DEWA published tariff (simplified, updated 2026-11-20), simulated device. It replaces the EcoWatch note (`../ARCHITECTURE_NOTE.md`), which described the earlier placeholder build.*
 
 ## 30-second spoken version
 
@@ -44,7 +46,8 @@ The AI can make the system more cautious or leave it unchanged; it cannot loosen
 - **Bill forecaster:** month so far plus the average of the last 14 full days times the remaining days, priced slab by slab (electricity with a fuel surcharge, water), with and without the leak so the leak's cost in AED is visible. A naive projection, not a prediction.
 - **Occupancy privacy:** one allow-list function builds every outbound AI payload and an assertion re-checks it. The result page lists what was sent. A request to export occupancy is blocked (scenario 10). n8n runs on the laptop, not in the cloud.
 - **Heat-safety guard:** hard limits in one object (`LIMITS`) and one function (`heatGuard`). The write gateway checks them a second time.
-- **Human approval:** required for setpoint changes, main-valve shutoff and rollbacks. Leak alerts and forecasts are automatic.
+- **Human approval:** required for setpoint changes, main-valve shutoff and rollbacks. Forecasts are automatic. Whether a leak alert is automatic depends on the **evidence score**: HIGH (85 and up) raises it by itself, MEDIUM (50-84) holds it until a named person approves, LOW (under 50) raises nothing and watches. Code decides this; the AI never sees the score.
+- **Evidence strength and adaptive autonomy:** `evidenceStrength` scores each leak verdict 0-100 (missing night readings, impossible readings, meter disagreement, stale feed, short history, weak signal) and lists every deduction on the result page. `autonomyFor` maps the score to what the agent may do alone. No score fails closed to watch only.
 
 ## Defence in layers
 
@@ -57,13 +60,15 @@ The AI can make the system more cautious or leave it unchanged; it cannot loosen
 - **A cloud model is rate-limited or down:** chain is Groq gpt-oss-120b, then Groq gpt-oss-20b (its own limit), then local Ollama (qwen3:1.7b), then a plain-code template for the explanation. Each AI step (plan, replan, explain) has the chain.
 - **Every AI is down:** the planner uses a fixed order, the guard and maths are unaffected, the explanation is a template. Safety does not depend on the AI.
 - **The AI returns nonsense or something hostile:** the parse or the allow-list overrides it; two bad planner picks switch to the fixed order; a failed replan counts as an attempt, and after 2 a person decides.
-- **Bad data:** corrupt, stale or disagreeing feeds stop the run as "untrusted data" and nothing is judged.
+- **Bad data:** a few impossible readings (HS-5.3) are set aside, logged and kept out of the leak check and the bill; corrupt, stale or disagreeing feeds stop the run as "untrusted data" and nothing is judged.
+- **A room sensor goes offline (HS-5.5):** that room is assumed occupied and hot, so it is held at the 24 C ceiling and never raised; other empty rooms can be proposed up to 27 C, still with a person approving. A missing outdoor temperature counts as hot.
+- **The privacy filter fails (HS-5.2):** the explanation step sends the plain-code template and makes no cloud call.
 - **A write fails:** the gateway rolls back to the snapshot.
 - **A mistaken approval:** Undo restores the previous state.
 
 ## How it was tested
 
-- `tests/test_core.js`: **155** unit checks, including limits and boundaries (27.0 allowed, 27.1 blocked).
+- `tests/test_core.js`: **176** unit checks, including limits and boundaries (27.0 allowed, 27.1 blocked).
 - `tests/sim_workflow.js`: **202** checks running the real generated graph in a mini engine with stubbed AI, including garbage, failing and hostile AI replies, replan paths, undo, replay and persistence.
 - `tests/live_run.js`: **83** checks on the live local n8n with real Groq, and **72** with Groq switched off so Ollama alone did everything. This found and fixed a real bug: Ollama was unreachable at `localhost` (IPv6); the URL is now `127.0.0.1`.
 - **Quota test:** 42 back-to-back runs (14 scenarios x 3 rounds) hit no rate-limit errors. That proves one moment on one free key, not a guarantee; repeat it on the day.

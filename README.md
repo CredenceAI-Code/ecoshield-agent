@@ -1,4 +1,6 @@
 # EcoShield (Domain 5) in local n8n: v3, what exists and how to run it
+**On the n8n canvas every node name starts with its number, for example `1) Console form`, `2) Validate input`, `19b) Cloud call allowed?`, `37) Respond HTML`. The numbers match the node numbers in the Node Notes. This document uses the plain names.**
+
 
 Built 2026-11-19. Synthetic meter data; tariff = DEWA's published rates (checked 2026-11-20, simplified). Everything below was run, not just written.
 
@@ -31,7 +33,7 @@ Built 2026-11-19. Synthetic meter data; tariff = DEWA's published rates (checked
 | 10 | Demo and explain | **Code + human** | Per-run page (safe case, approval case, blocked case, injection case, corrupt feed) + standing dashboard + replay from the stored log with zero tools or AI re-run. |
 
 ## Files
-- `CHECKPOINTS.md` timeline (plan 13:44, first code 18:15) and his decisions; `PLAN.md` the plan AS BUILT (rewritten after the build; the original pre-code Python plan is `PLAN_v0_python_design_2026-11-19.md`). `core.js` all plain-code logic; `page_js.js` page builders; `make_ecoshield_workflow.py` -> `ecoshield_workflow.json` (37 nodes, deterministic ids). Dated copies `EcoShield_Agent_export_2026-11-19_v1.json` (first build), `_v2.json`, `_v3.json` (replan loop, 127.0.0.1 fix), `_v4.json` (14 scenarios, 20B link, approver note), `EcoShield_Agent_export_2026-11-20_v5.json` (current: simpler result page, AI wording guard).
+- `CHECKPOINTS.md` timeline (plan 13:44, first code 18:15) and his decisions; `PLAN.md` the plan AS BUILT (rewritten after the build; the original pre-code Python plan is `PLAN_v0_python_design_2026-11-19.md`). `core.js` all plain-code logic; `page_js.js` page builders; `make_ecoshield_workflow.py` -> `ecoshield_workflow.json` (38 nodes, deterministic ids). Dated copies `EcoShield_Agent_export_2026-11-19_v1.json` (first build), `_v2.json`, `_v3.json` (replan loop, 127.0.0.1 fix), `_v4.json` (14 scenarios, 20B link, approver note), `EcoShield_Agent_export_2026-11-20_v5.json` (current: simpler result page, AI wording guard).
 - `data/smart_resource_meters.csv` (7,223 hourly rows, 14 scenarios), `data/scenarios.csv`, `data/sample_audit_excerpt.jsonl` (from v1).
 - Tests: `tests/test_core.js` (176), `tests/sim_workflow.js` (221; the REAL graph in a mini engine with stubbed AI incl. bad/failing replies), `tests/live_run.js` (83, run once with Groq and once with Groq switched off so Ollama alone does everything; `tests/ollama_only_workflow.json` is that copy, built with `ECO_OLLAMA_ONLY=1 python make_ecoshield_workflow.py`; the live n8n with real Groq: all 14 scenarios, repeat, undo x2, empty undo, replay, dashboard, typed injection, blank reviewer), `tests/live_persist.js`.
 

@@ -14,7 +14,7 @@ Unzip to a folder such as `C:\Users\<name>\Desktop\ecoshield_transfer`. Then:
 cd $HOME\Desktop\ecoshield_transfer\ecoshield
 node tests/test_core.js
 ```
-Expected: ends with `155 passed, 0 failed`.
+Expected: ends with `176 passed, 0 failed`.
 
 ## 2. Start n8n (leave this window open)
 ```
@@ -48,7 +48,7 @@ Keep `qwen3:1.7b`: it is the model all our tests used.
 ## 5. Check it works
 1. Console, scenario `1`, submit, then Approve with a name. The page says "Approved by <name> and applied".
 2. Scenario `6`: "Blocked by a hard rule". Scenario `11`: "Rejected before any AI saw it".
-3. Optional: `node tests/sim_workflow.js` (203 passed).
+3. Optional: `node tests/sim_workflow.js` (221 passed).
 4. Before the demo run **RESET - clear the demo memory** on the console.
 
 ## 6. After the event
