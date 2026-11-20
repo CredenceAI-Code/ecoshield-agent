@@ -533,16 +533,19 @@ link("Dashboard page", "Respond HTML")
 
 # Canvas layout only (no effect on behaviour): one main row, the three AI providers of each step stacked 180 px apart so nothing overlaps.
 LAYOUT = {
-    "Console form": (0, 300), "Validate input": (260, 300), "Input accepted?": (520, 300), "Plan state": (780, 300), "Ask planner LLM?": (1040, 300),
-    "Groq plan": (1300, 100), "Groq 20B plan": (1300, 300), "Ollama plan": (1300, 500), "Parse plan": (1560, 300), "Finished?": (1820, 300),
-    "Run tool": (1820, -60), "Replan check": (2080, 300), "Replan needed?": (2340, 300),
-    "Groq replan": (2600, -300), "Groq 20B replan": (2600, -120), "Ollama replan": (2600, 60), "Parse replan": (2860, -120),
-    "Auto actions": (2600, 300), "Build LLM prompt": (2860, 300), "Cloud call allowed?": (2990, 420),
-    "Groq explain": (3120, 120), "Groq 20B explain": (3120, 300), "Ollama explain": (3120, 480), "Parse LLM": (3380, 300),
-    "Needs approval?": (3640, 300), "Approval form": (3900, 100), "Approve and write": (4160, 100),
-    "Needs review?": (3900, 500), "No write": (4160, 500), "Review form": (4160, 700), "Record review": (4420, 700),
-    "Save memory": (4420, 300), "Build page": (4680, 300), "Write audit log": (4940, 300), "Show result": (5200, 300),
-    "Dashboard hook": (0, 1000), "Dashboard page": (260, 1000), "Respond HTML": (520, 1000),
+    # main line, left to right at y=0. AI fallback chains (Groq -> Groq 20B -> Ollama) sit on the row below (y=240), so
+    # the line that skips them runs straight. Branches go up (y=-240) or down. x steps are 260.
+    "Console form": (0, 0), "Validate input": (260, 0), "Input accepted?": (520, 0), "Plan state": (780, 0), "Ask planner LLM?": (1040, 0),
+    "Groq plan": (1300, 240), "Groq 20B plan": (1560, 240), "Ollama plan": (1820, 240),
+    "Parse plan": (2080, 0), "Finished?": (2340, 0), "Run tool": (2340, -240),
+    "Replan check": (2600, 0), "Replan needed?": (2860, 0),
+    "Groq replan": (3120, 240), "Groq 20B replan": (3380, 240), "Ollama replan": (3640, 240), "Parse replan": (3900, 240),
+    "Auto actions": (3120, 0), "Build LLM prompt": (3380, 0), "Cloud call allowed?": (3640, 0),
+    "Groq explain": (3900, -240), "Groq 20B explain": (4160, -240), "Ollama explain": (4420, -240), "Parse LLM": (4680, 0),
+    "Needs approval?": (4940, 0), "Approval form": (5200, 0), "Approve and write": (5460, 0),
+    "Needs review?": (5200, 240), "Review form": (5460, 240), "Record review": (5720, 240), "No write": (5460, 480),
+    "Save memory": (5720, 0), "Build page": (5980, 0), "Write audit log": (6240, 0), "Show result": (6500, 0),
+    "Dashboard hook": (0, 800), "Dashboard page": (260, 800), "Respond HTML": (520, 800),
 }
 for _n in nodes:
     if _n["name"] in LAYOUT:
