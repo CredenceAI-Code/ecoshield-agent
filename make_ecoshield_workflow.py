@@ -15,7 +15,7 @@ OLLAMA_ONLY = os.environ.get("ECO_OLLAMA_ONLY") == "1"   # test build: Groq URL 
 OUT = os.path.join(HERE, "tests", "ollama_only_workflow.json") if OLLAMA_ONLY else os.path.join(HERE, "ecoshield_workflow.json")
 WORKFLOW_ID = "va1J6ZZ2bCfcd2mT"          # existing local workflow: importing with this id overwrites it
 CONSOLE_FORM_ID = "be2bf8f1-b886-4585-950c-82bcc0648882"   # keep the already-published form URL
-GROQ = {"id": "cp345zTDAw124tjT", "name": "Groq key"}
+GROQ = {"id": os.environ.get("ECO_GROQ_CRED_ID", "cp345zTDAw124tjT"), "name": "Groq key"}   # on another machine: set ECO_GROQ_CRED_ID to the id of the "Groq key" credential created there
 GROQ_URL = "http://127.0.0.1:9/groq-switched-off" if os.environ.get("ECO_OLLAMA_ONLY") == "1" else "https://api.groq.com/openai/v1/chat/completions"
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"   # 127.0.0.1, not localhost: Node may try IPv6 ::1 first, where Ollama is not listening
 AUDIT_FILE = os.path.join(os.path.expanduser("~"), ".n8n-files", "ecoshield_audit.jsonl").replace("\\", "/")
