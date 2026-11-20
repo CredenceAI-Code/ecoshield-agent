@@ -2,6 +2,11 @@
 
 Built 2026-11-19. Synthetic meter data; tariff = DEWA's published rates (checked 2026-11-20, simplified). Everything below was run, not just written.
 
+## Live browser demo (GitHub Pages)
+- `index.html` loads the same `core.js` the tests run, in the browser, on synthetic data: all 14 scenarios, leak chart, DEWA-based bill table, a heat-guard "try to break it" panel, the privacy filter, approval + write gateway + undo, and a session audit trail. Live at https://credenceai-code.github.io/ecoshield-agent/ (once Pages is on).
+- It does NOT include the AI planner or the AI-written explanation; those run in the local n8n workflow below. The page says so.
+- Local check: `python -m http.server 8765` in this folder, then open `http://127.0.0.1:8765/index.html`.
+
 ## Run it
 - Console form: `http://localhost:5678/form/be2bf8f1-b886-4585-950c-82bcc0648882` (pick a scenario; optional operator note).
 - Dashboard + replay: `http://localhost:5678/webhook/ecoshield-dashboard` (scenario cards, "Run this scenario" links, Undo, Reset, replay any past case from the log).

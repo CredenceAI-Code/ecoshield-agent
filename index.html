@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EcoShield Live Demo</title>
+<meta name="description" content="Browser demo of EcoShield's real code layer: leak detector, DEWA-based bill forecaster, heat-safety guard, privacy filter and write gateway. Synthetic data.">
+<style>
+:root{--bg:#0b1118;--panel:#121c27;--panel2:#172433;--line:#26384b;--teal:#1f6f65;--tealtext:#6fc4b5;--gold:#c9a25c;--red:#b5645a;--text:#e8eef3;--mute:#9aaebd;--dim:#6c8093;--green:#4fa58a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Calibri,"Segoe UI",system-ui,-apple-system,Arial,sans-serif;font-size:15px;line-height:1.45}
+a{color:var(--tealtext)}
+header{padding:22px 20px 8px;max-width:1240px;margin:0 auto}
+.eyebrow{color:var(--tealtext);font-size:12px;letter-spacing:.14em;font-weight:700}
+h1{margin:6px 0 4px;font-size:30px}
+.tag{color:var(--mute);margin:0 0 12px}
+.note{background:#0e2a2b;border:1px solid var(--teal);border-radius:10px;padding:12px 14px;color:var(--text);max-width:1240px}
+.note b{color:var(--tealtext)}
+.wrap{max-width:1240px;margin:0 auto;padding:12px 20px 40px;display:grid;grid-template-columns:300px 1fr;gap:18px}
+@media(max-width:860px){.wrap{grid-template-columns:1fr}}
+.list{display:flex;flex-direction:column;gap:6px}
+.list h2{font-size:13px;letter-spacing:.1em;color:var(--mute);margin:6px 0 2px}
+.sc{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;text-align:left;color:var(--text);cursor:pointer;font:inherit}
+.sc:hover{border-color:var(--teal)}
+.sc.on{border-color:var(--tealtext);background:var(--panel2)}
+.sc small{display:block;color:var(--mute)}
+.sc .n{color:var(--gold);font-weight:700;margin-right:6px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.card h3{margin:0 0 8px;font-size:17px}
+.card h3 span{color:var(--tealtext);margin-right:8px}
+.mut{color:var(--mute)} .dim{color:var(--dim);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip{border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:13px;color:var(--mute)}
+.chip.ok{border-color:var(--green);color:#a8e0cd} .chip.no{border-color:var(--red);color:#e3a79f}
+.badge{display:inline-block;border-radius:8px;padding:3px 10px;font-weight:700;font-size:14px}
+.b-ok{background:#143a33;color:#8fe0c6;border:1px solid var(--green)}
+.b-bad{background:#3a1d1a;color:#f0b4ab;border:1px solid var(--red)}
+.b-warn{background:#3a2f17;color:#e8c987;border:1px solid var(--gold)}
+.b-neutral{background:var(--panel2);color:var(--mute);border:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;margin:6px 0;font-size:14px}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--mute);font-weight:600} td.r,th.r{text-align:right}
+textarea,input[type=text],select{width:100%;background:#0e1620;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px;font:inherit}
+button.act{background:var(--teal);color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;font-weight:700;cursor:pointer}
+button.act.alt{background:var(--panel2);border:1px solid var(--line);color:var(--text)}
+button.act:disabled{opacity:.4;cursor:default}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px} @media(max-width:700px){.row{grid-template-columns:1fr}}
+label{display:block;color:var(--mute);font-size:13px;margin:8px 0 3px}
+input[type=range]{width:100%}
+.big{font-size:26px;font-weight:700;color:var(--gold)}
+.grey{opacity:.45}
+.log{font-family:Consolas,monospace;font-size:12.5px;color:var(--mute);max-height:190px;overflow:auto}
+.log div{padding:2px 0;border-bottom:1px dashed var(--line)}
+.dev{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0} .dev div{background:var(--panel2);border-radius:8px;padding:8px;text-align:center}
+.dev b{display:block;font-size:18px}
+footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">TECHX DUBAI'26 · AI AGENT ARENA · DOMAIN 5 · CREDENCE HIGH SCHOOL</div>
+  <h1>EcoShield live demo</h1>
+  <p class="tag">AI talks, code decides, a human approves.</p>
+  <div class="note"><b>What runs here:</b> EcoShield's real <code>core.js</code> (the same file our tests run) in your browser, on <b>synthetic</b> data: leak detector, bill forecaster on DEWA's published tariff (simplified), heat-safety guard, privacy filter, input checks and the single write gateway. <b>What does not:</b> the AI planner and the AI-written explanation, which run in our local n8n workflow (screenshots are in the presentation). Nothing on this page calls an AI or sends data anywhere.</div>
+</header>
+<div class="wrap">
+  <aside class="list" id="list"></aside>
+  <main id="main"></main>
+</div>
+<footer>Synthetic meter data · DEWA published slab tariff, simplified (no fixed meter charge, commercial water slabs assumed) · Code: <a href="https://github.com/CredenceAI-Code/ecoshield-agent">github.com/CredenceAI-Code/ecoshield-agent</a></footer>
+
+<script src="core.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var esc = function (t) { return String(t === undefined || t === null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var n2 = function (v) { return (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var n0 = function (v) { return Math.round(v).toLocaleString('en-US'); };
+
+  var devices = {}, hist = {};       // one simulated building per scenario (as in the n8n agent), kept for this browser session
+  var device = null, history = null; // the current scenario's building and its undo snapshots
+  var alerted = {};                  // scenario ids that already raised their automatic alert
+  var audit = [];
+  var curId = 1, curNote = '', playground = null, lastResult = '';
+
+  function log(kind, text) { audit.unshift({ t: new Date().toLocaleTimeString('en-GB'), kind: kind, text: text }); renderAudit(); }
+
+  function pipeline(rec, note) {
+    var req = rec.request, scn = rec.scenario;
+    var nc = validateNote(note);
+    if (!nc.ok) return { stage: 'note', nc: nc, guard: { status: 'BLOCKED', rule: 'injection_blocked', reason: nc.reason } };
+    var feed = validateMeterRows(rec.rows, rec.now);
+    if (!feed.ok) return { stage: 'feed', nc: nc, feed: feed, guard: heatGuard(req, {}) };
+    var out = run_leak_and_bill_forecaster(scn.id);
+    var state = { occupied: rec.now.occupied, outdoor_c: rec.now.outdoor_c };
+    var guard = heatGuard(req, Object.assign({}, state, { device: device }));
+    return { stage: 'ok', nc: nc, feed: feed, leak: out.leak, bill: out.bill, guard: guard, state: state };
+  }
+
+  function badge(status) {
+    var cls = status === 'BLOCKED' ? 'b-bad' : status === 'NEEDS_APPROVAL' ? 'b-warn' : status === 'AUTO' ? 'b-ok' : 'b-neutral';
+    return '<span class="badge ' + cls + '">' + esc(status) + '</span>';
+  }
+  function verdictBadge(v) {
+    var cls = v === 'LEAK' ? 'b-bad' : v === 'WATCH' || v === 'INSUFFICIENT_DATA' ? 'b-warn' : v === 'NO_LEAK' ? 'b-ok' : 'b-neutral';
+    return '<span class="badge ' + cls + '">' + esc(v) + '</span>';
+  }
+
+  function renderList() {
+    var h = '<h2>PICK A SCENARIO</h2>';
+    ALL_SCENARIOS.forEach(function (s) {
+      h += '<button class="sc' + (s.id === curId ? ' on' : '') + '" data-id="' + s.id + '"><span class="n">' + s.id + '</span>' + esc(s.name) + '<small>' + esc(s.request.type.replace(/_/g, ' ').toLowerCase()) + '</small></button>';
+    });
+    h += '<h2>DEMO CONTROLS</h2><button class="sc" id="resetDev">Reset the simulated building</button>';
+    $('#list').innerHTML = h;
+    Array.prototype.forEach.call(document.querySelectorAll('.sc[data-id]'), function (b) {
+      b.addEventListener('click', function () { curId = +b.getAttribute('data-id'); curNote = ''; playground = null; lastResult = ''; render(); });
+    });
+    $('#resetDev').addEventListener('click', function () { devices = {}; hist = {}; alerted = {}; lastResult = ''; log('reset', 'All simulated buildings reset to their defaults.'); render(); });
+  }
+
+  function nightChart(leak) {
+    if (!leak || !leak.nights || !leak.nights.length) return '';
+    var nights = leak.nights, L = LIMITS, max = Math.max(L.LEAK_MIN_LPH * 1.5, Math.max.apply(null, nights.map(function (n) { return n.min; })) * 1.15);
+    var W = 440, H = 150, pad = 28, bw = (W - pad - 10) / nights.length, y = function (v) { return H - 22 - (v / max) * (H - 40); };
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Lowest night-time water flow per night">';
+    s += '<line x1="' + pad + '" x2="' + (W - 6) + '" y1="' + y(L.LEAK_MIN_LPH) + '" y2="' + y(L.LEAK_MIN_LPH) + '" stroke="#b5645a" stroke-dasharray="4 3"/><text x="' + (W - 8) + '" y="' + (y(L.LEAK_MIN_LPH) - 4) + '" fill="#e3a79f" font-size="11" text-anchor="end">leak rule: ' + L.LEAK_MIN_LPH + ' L/h</text>';
+    nights.forEach(function (n, i) {
+      var x = pad + i * bw + 4, h = Math.max(1, (n.min / max) * (H - 40)), col = n.min >= L.LEAK_MIN_LPH ? '#b5645a' : n.min >= L.WATCH_MIN_LPH ? '#c9a25c' : '#1f6f65';
+      s += '<rect x="' + x + '" y="' + (H - 22 - h) + '" width="' + (bw - 8) + '" height="' + h + '" rx="3" fill="' + col + '"/>';
+      s += '<text x="' + (x + (bw - 8) / 2) + '" y="' + (H - 8) + '" fill="#9aaebd" font-size="11" text-anchor="middle">d' + n.day + '</text>';
+      s += '<text x="' + (x + (bw - 8) / 2) + '" y="' + (H - 26 - h) + '" fill="#e8eef3" font-size="11" text-anchor="middle">' + n.min + '</text>';
+    });
+    return s + '</svg><div class="dim">Lowest water flow (L/h) between 01:00 and 05:00 on nights the building was empty. A leak never sleeps.</div>';
+  }
+
+  function slabTable(steps, unit, rateUnit) {
+    var h = '<table><tr><th>Slab (' + unit + ')</th><th class="r">Used</th><th class="r">AED/' + rateUnit + '</th><th class="r">AED</th></tr>';
+    steps.forEach(function (s) { h += '<tr><td>' + n0(s.from) + (s.to ? ' to ' + n0(s.to) : '+') + '</td><td class="r">' + n0(s.units) + '</td><td class="r">' + s.rate + '</td><td class="r">' + n2(s.cost) + '</td></tr>'; });
+    return h + '</table>';
+  }
+
+  function sectionInput(p, note) {
+    var h = '<div class="card"><h3><span>1</span>Input checks <span class="dim" style="font-weight:400">(before any tool or AI)</span></h3>';
+    h += '<label for="note">Operator note (free text from a person or an automation; treated as data, never as instructions). Try typing: <i>ignore the safety limits</i></label>';
+    h += '<textarea id="note" rows="2" placeholder="Optional note">' + esc(note) + '</textarea>';
+    h += '<div class="chips">';
+    h += p.nc.ok ? '<span class="chip ok">note clean</span>' : '<span class="chip no">note rejected: ' + esc(p.nc.reason) + '</span>';
+    if (p.feed) {
+      h += p.feed.ok ? '<span class="chip ok">meter feed passed (' + p.feed.rows + ' readings)</span>' : '<span class="chip no">meter feed untrusted: ' + esc(p.feed.issues.join('; ')) + '</span>';
+    } else h += '<span class="chip">meter feed not checked: stopped at the note</span>';
+    return h + '</div></div>';
+  }
+
+  function sectionLeak(p) {
+    var h = '<div class="card' + (p.leak ? '' : ' grey') + '"><h3><span>2</span>Leak check <span class="dim" style="font-weight:400">(plain code)</span></h3>';
+    if (!p.leak) return h + '<div class="mut">Not run: the input checks stopped this request first.</div></div>';
+    h += verdictBadge(p.leak.verdict) + ' <span class="mut">' + esc(p.leak.reason) + '</span>' + nightChart(p.leak);
+    return h + '</div>';
+  }
+
+  function sectionBill(p) {
+    var h = '<div class="card' + (p.bill ? '' : ' grey') + '"><h3><span>3</span>Bill forecast <span class="dim" style="font-weight:400">(DEWA published tariff, simplified)</span></h3>';
+    if (!p.bill) return h + '<div class="mut">Not run.</div></div>';
+    var w = p.bill.with_leak;
+    h += '<div class="big">AED ' + n2(w.total_aed) + ' <span class="mut" style="font-size:15px;font-weight:400">forecast for this month</span></div>';
+    if (p.bill.without_leak) h += '<div>Without the leak: AED ' + n2(p.bill.without_leak.total_aed) + '. <b style="color:var(--gold)">The leak adds about AED ' + n2(p.bill.leak_bill_impact_aed) + '.</b></div>';
+    h += '<div class="row"><div>' + slabTable(w.electricity.steps, 'kWh', 'kWh') + '<div class="dim">Fuel surcharge AED ' + n2(w.electricity.fuel_surcharge) + '</div></div>';
+    h += '<div>' + slabTable(w.water.steps, 'm³', 'm³') + '<div class="dim">Fuel surcharge AED ' + n2(w.water.fuel_surcharge) + '</div></div></div>';
+    h += '<div class="dim">Subtotal AED ' + n2(w.subtotal_aed) + ' + 5% VAT AED ' + n2(w.vat_aed) + '. ' + esc(p.bill.method) + '.</div>';
+    return h + '</div>';
+  }
+
+  function sectionGuard(p, rec) {
+    var req = rec.request, g = p.guard;
+    var h = '<div class="card"><h3><span>4</span>Safety guard <span class="dim" style="font-weight:400">(code only, the AI cannot override it)</span></h3>';
+    h += 'Request: <b>' + esc(req.type.replace(/_/g, ' ').toLowerCase()) + (req.setpoint_c !== undefined ? ' to ' + req.setpoint_c + ' °C' : '') + '</b> &nbsp; ' + badge(g.status) + ' <span class="chip">' + esc(g.rule) + '</span>';
+    h += '<div style="margin-top:6px">' + esc(g.reason) + '</div>';
+    if (g.suggested_setpoint_c) h += '<div class="dim">Highest allowed setpoint here: ' + g.suggested_setpoint_c + ' °C. (In the n8n agent, the AI may propose one safer setpoint after a block, at most 2 tries, and the guard re-checks it.)</div>';
+    h += '</div>';
+    // playground
+    if (!playground) playground = { type: req.type, sp: req.setpoint_c === undefined ? 23 : req.setpoint_c, occ: rec.now.occupied ? 1 : 0, out: rec.now.outdoor_c };
+    var pg = playground;
+    var pr = { type: pg.type }; if (pg.type === 'SETPOINT') pr.setpoint_c = pg.sp;
+    var pgr = heatGuard(pr, { occupied: pg.occ, outdoor_c: pg.out, device: device });
+    h += '<div class="card"><h3><span>★</span>Try to break the guard</h3><div class="mut">Change the request or the conditions. The limits are hard-coded: occupied rooms never above ' + LIMITS.OCCUPIED_MAX_C + ' °C, empty pre-cooling never above ' + LIMITS.UNOCCUPIED_PRECOOL_MAX_C + ' °C, cooling never switched off at ' + LIMITS.HEAT_OUTDOOR_C + ' °C or hotter with people inside.</div>';
+    h += '<div class="row"><div><label>Request</label><select id="pgType">';
+    ['SETPOINT', 'COOLING_OFF', 'MAIN_WATER_SHUTOFF', 'EXPORT_OCCUPANCY'].forEach(function (t) { h += '<option value="' + t + '"' + (pg.type === t ? ' selected' : '') + '>' + t.replace(/_/g, ' ').toLowerCase() + '</option>'; });
+    h += '</select>';
+    h += '<label>Requested setpoint: <b id="spv">' + pg.sp + '</b> °C (used for "setpoint")</label><input type="range" id="pgSp" min="16" max="35" step="0.5" value="' + pg.sp + '"></div>';
+    h += '<div><label>Building</label><select id="pgOcc"><option value="1"' + (pg.occ ? ' selected' : '') + '>occupied (people inside)</option><option value="0"' + (!pg.occ ? ' selected' : '') + '>empty</option></select>';
+    h += '<label>Outdoor temperature: <b id="outv">' + pg.out + '</b> °C</label><input type="range" id="pgOut" min="20" max="50" step="1" value="' + pg.out + '"></div></div>';
+    h += '<div style="margin-top:8px" id="pgResult">' + badge(pgr.status) + ' <span class="chip">' + esc(pgr.rule) + '</span> ' + esc(pgr.reason) + '</div></div>';
+    return h;
+  }
+
+  function sectionPrivacy(p, rec) {
+    var h = '<div class="card"><h3><span>5</span>Privacy filter <span class="dim" style="font-weight:400">(allow-list, not block-list)</span></h3>';
+    var scn = rec.scenario, ob = buildOutbound(scn, p.leak || null, p.bill || null, p.guard, rec.request);
+    var raw = Object.assign({}, ob, { occupancy_schedule: 'hourly flags', room_101_presence: rec.now.occupied, occupied: rec.now.occupied, people_count: 'n/a' });
+    var egress;
+    try { egress = sanitize(raw, 'cloud AI').egress; } catch (e) { egress = null; }
+    if (!egress) return h + '<div class="chip no">blocked: ' + esc('occupancy-like data detected') + '</div></div>';
+    h += '<div class="mut">Before any outside AI call, the payload is rebuilt from an allow-list. Occupancy never leaves the device. For this demo we also slip a few occupancy-style fields into the raw payload (<i>occupancy_schedule</i>, <i>room_101_presence</i>, <i>occupied</i>, <i>people_count</i>) to show them being stripped.</div>';
+    h += '<div class="row"><div><label>Allowed to leave (' + egress.sent_fields.length + ' fields)</label><div class="chips">' + egress.sent_fields.map(function (f) { return '<span class="chip ok">' + esc(f) + '</span>'; }).join('') + '</div></div>';
+    h += '<div><label>Stripped and kept on the device</label><div class="chips">' + egress.stripped_fields.map(function (f) { return '<span class="chip no">' + esc(f) + '</span>'; }).join('') + '</div></div></div>';
+    h += '<div>Occupancy sent to a cloud AI: <b style="color:var(--green)">' + (egress.occupancy_sent ? 'YES' : 'NO') + '</b> (' + egress.bytes + ' bytes would be sent)</div></div>';
+    return h;
+  }
+
+  function deviceCard() {
+    var h = '<div class="dev"><div><span class="dim">setpoint</span><b>' + device.setpoint_c + ' °C</b></div><div><span class="dim">cooling</span><b>' + device.cooling + '</b></div><div><span class="dim">main valve</span><b>' + device.main_valve + '</b></div><div><span class="dim">alerts</span><b>' + (device.alerts || []).length + '</b></div></div>';
+    return h;
+  }
+
+  function sectionApproval(p, rec) {
+    var req = rec.request, g = p.guard;
+    var h = '<div class="card"><h3><span>6</span>Human approval and the single write gateway</h3>';
+    // automatic, low-risk alert for leak-type verdicts
+    if (p.leak && ['LEAK', 'WATCH', 'INSUFFICIENT_DATA'].indexOf(p.leak.verdict) >= 0) {
+      if (!alerted[rec.scenario.id]) {
+        var gw = writeGateway({ type: 'RAISE_ALERT', alert: p.leak.verdict + ' in scenario ' + rec.scenario.id }, p.state, device);
+        if (gw.ok) { history.push(gw.before); device = devices[curId] = gw.device; alerted[rec.scenario.id] = true; log('auto', 'Leak alert raised automatically through the write gateway (scenario ' + rec.scenario.id + ', ' + p.leak.verdict + ').'); }
+      }
+      h += '<div class="chips"><span class="chip ok">leak alert raised automatically (low risk, logged, can be undone)</span></div>';
+    }
+    if (g.status === 'NEEDS_APPROVAL') {
+      h += '<div>A person must approve: <b>' + esc(req.type.replace(/_/g, ' ').toLowerCase()) + (req.setpoint_c !== undefined ? ' to ' + req.setpoint_c + ' °C' : '') + '</b>. Nothing changes unless a name is typed.</div>';
+      h += '<div class="row"><div><label>Reviewer name (goes in the audit trail)</label><input type="text" id="rev" placeholder="Your full name"></div><div><label>&nbsp;</label><button class="act" id="appr">Approve</button> <button class="act alt" id="rej">Reject</button></div></div>';
+    } else if (g.status === 'NO_CHANGE') h += '<div class="mut">Nothing to approve: that state already holds.</div>';
+    else if (g.status === 'BLOCKED') h += '<div class="mut">Blocked by a hard rule, so there is nothing to approve. A person cannot unblock a hard limit.</div>';
+    h += '<div id="gwresult" style="margin-top:6px">' + lastResult + '</div>';
+    h += '<div class="mut" style="margin-top:8px">The simulated building (a record, not real hardware):</div>' + deviceCard();
+    h += '<button class="act alt" title="In the n8n agent an undo is also approved by a named person" id="undo"' + (history.length ? '' : ' disabled') + '>Undo the last change (demo shortcut)</button>';
+    return h + '</div>';
+  }
+
+  function renderAudit() {
+    var el = $('#audit'); if (!el) return;
+    el.innerHTML = audit.length ? audit.map(function (a) { return '<div>' + a.t + ' · ' + esc(a.kind) + ' · ' + esc(a.text) + '</div>'; }).join('') : '<div>No events yet. Approve something above.</div>';
+  }
+
+  function render() {
+    renderList();
+    var rec = get_local_meter_and_occupancy(curId), scn = rec.scenario;
+    device = devices[curId] || (devices[curId] = defaultDevice()); history = hist[curId] || (hist[curId] = []);
+    var note = curNote !== '' ? curNote : (scn.note || '');
+    var p = pipeline(rec, note);
+    var h = '<div class="card"><h3>' + esc(scn.id + '. ' + scn.name) + '</h3><div class="mut">' + esc(scn.desc) + '</div><div class="chips"><span class="chip">day ' + rec.now.day + ', ' + String(rec.now.hour).padStart(2, '0') + ':00</span><span class="chip">' + (rec.now.occupied ? 'people inside' : 'building empty') + '</span><span class="chip">' + rec.now.outdoor_c + ' °C outside</span><span class="chip">synthetic data</span></div></div>';
+    h += sectionInput(p, note) + sectionLeak(p) + sectionBill(p) + sectionGuard(p, rec) + sectionPrivacy(p, rec) + sectionApproval(p, rec);
+    h += '<div class="card"><h3><span>7</span>Audit trail <span class="dim" style="font-weight:400">(this browser session; the n8n agent writes every step to a file)</span></h3><div class="log" id="audit"></div></div>';
+    $('#main').innerHTML = h;
+    renderAudit();
+    wire(rec, p, note);
+  }
+
+  function wire(rec, p, note) {
+    var n = $('#note');
+    n.addEventListener('change', function () { curNote = n.value === '' ? ' ' : n.value; lastResult = ''; render(); if (n.value !== '') log('input', 'Note checked: ' + (validateNote(n.value).ok ? 'clean' : 'rejected before any tool or AI.')); });
+    var upd = function () {
+      playground = { type: $('#pgType').value, sp: +$('#pgSp').value, occ: +$('#pgOcc').value, out: +$('#pgOut').value };
+      $('#spv').textContent = playground.sp; $('#outv').textContent = playground.out;
+      var pr = { type: playground.type }; if (playground.type === 'SETPOINT') pr.setpoint_c = playground.sp;
+      var r = heatGuard(pr, { occupied: playground.occ, outdoor_c: playground.out, device: device });
+      $('#pgResult').innerHTML = badge(r.status) + ' <span class="chip">' + esc(r.rule) + '</span> ' + esc(r.reason);
+    };
+    ['pgType', 'pgSp', 'pgOcc', 'pgOut'].forEach(function (id) { $('#' + id).addEventListener('input', upd); });
+    var ap = $('#appr'), rj = $('#rej');
+    if (ap) {
+      ap.addEventListener('click', function () { decide('Approve'); });
+      rj.addEventListener('click', function () { decide('Reject'); });
+    }
+    function decide(d) {
+      var rv = applyReview(d, $('#rev').value, '');
+      if (!rv.approved) {
+        lastResult = '<span class="badge b-neutral">NOT APPROVED</span> ' + esc(rv.note || (d + 'ed by ' + rv.reviewer + '. Nothing changed.'));
+        log('review', d === 'Approve' ? 'Approval ignored: no reviewer name. Nothing changed.' : 'Rejected by ' + rv.reviewer + '. Nothing changed.');
+        render(); return;
+      }
+      var gw = writeGateway(rec.request, p.state, device);
+      if (gw.ok) {
+        history.push(gw.before); device = devices[curId] = gw.device;
+        lastResult = '<span class="badge b-ok">APPLIED</span> Approved by ' + esc(rv.reviewer) + ' and applied through the single write gateway (snapshot kept, can be undone).';
+        log('write', 'Approved by ' + rv.reviewer + ': ' + rec.request.type + (rec.request.setpoint_c !== undefined ? ' ' + rec.request.setpoint_c + ' C' : '') + ' applied.');
+      } else {
+        lastResult = '<span class="badge b-bad">ROLLED BACK</span> ' + esc(gw.error);
+        log('write', 'Gateway refused: ' + gw.error);
+      }
+      render();
+    }
+    $('#undo').addEventListener('click', function () {
+      if (!history.length) return;
+      var prev = history[history.length - 1];
+      var gw = writeGateway({ type: 'ROLLBACK', restore: { setpoint_c: prev.setpoint_c, cooling: prev.cooling, main_valve: prev.main_valve, alerts: prev.alerts } }, { occupied: rec.now.occupied, outdoor_c: rec.now.outdoor_c }, device);
+      if (gw.ok) { history.pop(); device = devices[curId] = gw.device; lastResult = '<span class="badge b-ok">UNDONE</span> Rolled back to the previous snapshot.'; log('undo', 'Last change rolled back.'); }
+      else { lastResult = '<span class="badge b-bad">NOT UNDONE</span> ' + esc(gw.error); log('undo', 'Undo refused: ' + gw.error); }
+      render();
+    });
+  }
+
+  var q = new URLSearchParams(location.search).get('s');
+  if (q && ALL_SCENARIOS.some(function (s) { return s.id === +q; })) curId = +q;
+  render();
+})();
+</script>
+</body>
+</html>
