@@ -132,6 +132,17 @@ ok(C.heatGuard(sp(24), Object.assign({}, occ, { device: C.defaultDevice() })).st
   const r13 = C.get_local_meter_and_occupancy(13); ok(C.validateMeterRows(r13.rows, r13.now).ok && C.heatGuard(r13.request, { occupied: r13.now.occupied, outdoor_c: r13.now.outdoor_c, device: C.defaultDevice() }).rule === 'needs_approval', 'S13: exactly on the ceiling is allowed, still needs a person');
   const r14 = C.get_local_meter_and_occupancy(14), v14 = C.validateMeterRows(r14.rows, r14.now); ok(!v14.ok && v14.disagreements >= 6 && /disagree/.test(v14.issues.join(' ')) && v14.bad_values === 0, 'S14: two disagreeing meters reject the feed: ' + v14.issues.join(' | '));
   ok(C.validateMeterRows(C.get_local_meter_and_occupancy(2).rows, C.get_local_meter_and_occupancy(2).now).disagreements === 0, 'a feed with only one meter is not penalised');
+  { // HS-5.3: one negative reading and one 9,999 L/h spike on a normal day are set aside, not alarmed on, and kept out of the bill
+    const rec = C.get_local_meter_and_occupancy(5), base = C.run_leak_and_bill_forecaster(5), rows = rec.rows.map(x => Object.assign({}, x));
+    rows.find(r => r.day === 10 && r.hour === 14).water_lph = -20; rows.find(r => r.day === 11 && r.hour === 9).water_lph = 9999;
+    const v = C.validateMeterRows(rows, rec.now), out = C.run_leak_and_bill_forecaster(5, rows), tot = out.bill.with_leak.total_aed, t0 = base.bill.with_leak.total_aed;
+    ok(v.ok && v.set_aside === 2 && v.set_aside_notes.length === 2, 'HS-5.3: two glitch readings are set aside and the feed still passes');
+    ok(out.leak.verdict === base.leak.verdict && out.leak.verdict !== 'LEAK', 'HS-5.3: no false leak alarm from the glitches');
+    ok(out.set_aside.length === 2 && out.set_aside.some(s => s.value === -20) && out.set_aside.some(s => s.value === 9999), 'HS-5.3: both readings are logged with their values');
+    ok(tot <= t0 && t0 - tot < 20, 'HS-5.3: the 9,999 spike is not in the bill (' + tot + ' vs ' + t0 + ' AED)');
+    const many = rec.rows.map((x, k) => k % 20 === 0 ? Object.assign({}, x, { water_lph: -5 }) : x);
+    ok(!C.validateMeterRows(many, rec.now).ok, 'HS-5.3: a feed where more than 2% of readings are impossible is still rejected');
+  }
   const rows2 = C.get_local_meter_and_occupancy(2).rows.map(x => Object.assign({}, x, { water_b_lph: x.water_lph === null ? null : x.water_lph * 1.2 })); ok(C.validateMeterRows(rows2, { hour: 14 }).ok, 'two meters within 30% agree'); }
 // -- replan loop
 { const base = (id) => { const sc = C.ALL_SCENARIOS.find(x => x.id === id), rec = C.get_local_meter_and_occupancy(id); const state = { occupied: rec.now.occupied, outdoor_c: rec.now.outdoor_c }, device = C.defaultDevice();

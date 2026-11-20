@@ -121,11 +121,22 @@ function forecastBill(rows, leak, nowHour) {
   }
   return { method: 'month so far + average of the last 14 full days x remaining days (a naive projection, not a prediction)', month_days: MONTH_DAYS, today: TODAY, with_leak: withLeak, without_leak: without, leak_bill_impact_aed: impact, tariff_verified: TARIFF.verified, tariff_source: TARIFF.source };
 }
-function run_leak_and_bill_forecaster(id) {
+// Impossible sensor values (negative, or above the pipe/meter maximum) are set aside: replaced by "no reading", logged, and left out of the leak check and the bill.
+function quarantineBadReadings(rows) {
+  const RANGE = { water_lph: [0, 2000], water_b_lph: [0, 2000], kwh: [0, 200] }, set_aside = [];
+  const out = rows.map(r => {
+    let c = r;
+    Object.keys(RANGE).forEach(f => { const v = r[f]; if (v !== undefined && v !== null && !(typeof v === 'number' && isFinite(v) && v >= RANGE[f][0] && v <= RANGE[f][1])) { if (c === r) c = Object.assign({}, r); c[f] = null; set_aside.push({ day: r.day, hour: r.hour, field: f, value: v }); } });
+    return c;
+  });
+  return { rows: out, set_aside };
+}
+function run_leak_and_bill_forecaster(id, rowsIn) {
   const rec = get_local_meter_and_occupancy(id); if (rec.error) return rec;
-  const leak = detectLeak(rec.rows), bill = forecastBill(rec.rows, leak, rec.now.hour);
+  const q = quarantineBadReadings(rowsIn || rec.rows);
+  const leak = detectLeak(q.rows), bill = forecastBill(q.rows, leak, rec.now.hour);
   const slabs = bill.with_leak.electricity.steps.length;
-  return { scenario_id: +id, leak, bill, elec_slab_count: slabs };
+  return { scenario_id: +id, leak, bill, elec_slab_count: slabs, set_aside: q.set_aside };
 }
 
 // ---------- stage 2: validate and sanitise INPUT (before any model sees anything) ----------
@@ -148,7 +159,7 @@ function validateNote(text) {
 }
 // schema + range + freshness check on the meter feed. Null readings are allowed (gaps are judged by the leak detector).
 function validateMeterRows(rows, now) {
-  const issues = []; let bad = 0;
+  const issues = []; let bad = 0, setAside = 0; const notes = [];
   if (!Array.isArray(rows) || !rows.length) return { ok: false, issues: ['the feed has no readings'], rows: 0 };
   const seen = new Set();
   const num = (v, lo, hi) => v === null || (typeof v === 'number' && isFinite(v) && v >= lo && v <= hi);
@@ -156,16 +167,20 @@ function validateMeterRows(rows, now) {
     const key = r.day + ':' + r.hour;
     if (seen.has(key)) { bad++; if (issues.length < 5) issues.push('duplicate reading for day ' + r.day + ' hour ' + r.hour); }
     seen.add(key);
-    const good = Number.isInteger(r.day) && r.day >= 1 && r.day <= MONTH_DAYS && Number.isInteger(r.hour) && r.hour >= 0 && r.hour <= 23 &&
-      num(r.water_lph, 0, 2000) && (r.water_b_lph === undefined || num(r.water_b_lph, 0, 2000)) && num(r.kwh, 0, 200) && (r.occupied === 0 || r.occupied === 1) && num(r.outdoor_c, -10, 60) && num(r.setpoint_c, 10, 35);
-    if (!good) { bad++; if (issues.length < 5) issues.push('impossible reading on day ' + r.day + ' hour ' + r.hour + ' (water ' + r.water_lph + ' L/h, ' + r.kwh + ' kWh)'); }
+    const structural = Number.isInteger(r.day) && r.day >= 1 && r.day <= MONTH_DAYS && Number.isInteger(r.hour) && r.hour >= 0 && r.hour <= 23 &&
+      (r.occupied === 0 || r.occupied === 1) && num(r.outdoor_c, -10, 60) && num(r.setpoint_c, 10, 35);
+    const sensorOk = num(r.water_lph, 0, 2000) && (r.water_b_lph === undefined || num(r.water_b_lph, 0, 2000)) && num(r.kwh, 0, 200);
+    if (!structural) { bad++; if (issues.length < 5) issues.push('impossible reading on day ' + r.day + ' hour ' + r.hour + ' (water ' + r.water_lph + ' L/h, ' + r.kwh + ' kWh)'); }
+    else if (!sensorOk) { bad++; setAside++; if (notes.length < 5) notes.push('day ' + r.day + ' hour ' + r.hour + ': water ' + r.water_lph + ' L/h, ' + r.kwh + ' kWh'); }
   });
   // two independent sources must agree (manual p24: "two sources that disagree"). Only rows that carry a second meter are compared.
   let dis = 0; rows.forEach(r => { if (typeof r.water_lph === 'number' && typeof r.water_b_lph === 'number' && Math.abs(r.water_lph - r.water_b_lph) > Math.max(5, 0.3 * Math.max(r.water_lph, r.water_b_lph))) dis++; });
   if (dis >= 6) issues.push('the two water meters disagree by more than 30% on ' + dis + ' readings, so neither source can be trusted');
+  // a few glitching readings are set aside (see quarantineBadReadings); too many means the meter itself cannot be trusted
+  if (setAside > Math.max(1, Math.floor(rows.length * 0.02))) issues.push(setAside + ' of ' + rows.length + ' readings are impossible (limit 2%), so the meter cannot be trusted. Examples: ' + notes.join('; '));
   const last = rows[rows.length - 1], age = (TODAY - last.day) * 24 + (now.hour - last.hour);
   if (age > 2) issues.push('newest reading is ' + age + ' hours old (limit 2)');
-  return { ok: issues.length === 0, issues, bad_values: bad, newest_age_hours: age, rows: rows.length, disagreements: dis };
+  return { ok: issues.length === 0, issues, bad_values: bad, set_aside: setAside, set_aside_notes: notes, newest_age_hours: age, rows: rows.length, disagreements: dis };
 }
 
 // ---------- guard 1: privacy filter (allow-list, not block-list) ----------
@@ -333,4 +348,4 @@ function lookupHistory(mem, sid, reqType) {
   return { open_alert: (dev.alerts || []).some(a => a.open), last_decision: dec, prior_runs: (mem.history || []).filter(h => h.scenario_id === sid).length };
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { LIMITS, TARIFF, SCENARIOS, EXTRA_SCENARIOS, ALL_SCENARIOS, MAX_STEPS, MAX_INVALID_PICKS, MAX_REPLANS, REPLANNABLE, needsReplan, replanView, parseReplan, applyReplan, recordReview, genScenario, get_local_meter_and_occupancy, detectLeak, slabCost, billFor, forecastBill, run_leak_and_bill_forecaster, validateNote, validateMeterRows, sanitize, buildOutbound, PUBLIC_RULE, heatGuard, applyReview, defaultDevice, writeGateway, TOOLS, runnable, deterministicNext, planView, newMemory, lookupHistory, TODAY, MONTH_DAYS };
+if (typeof module !== 'undefined' && module.exports) module.exports = { quarantineBadReadings, LIMITS, TARIFF, SCENARIOS, EXTRA_SCENARIOS, ALL_SCENARIOS, MAX_STEPS, MAX_INVALID_PICKS, MAX_REPLANS, REPLANNABLE, needsReplan, replanView, parseReplan, applyReplan, recordReview, genScenario, get_local_meter_and_occupancy, detectLeak, slabCost, billFor, forecastBill, run_leak_and_bill_forecaster, validateNote, validateMeterRows, sanitize, buildOutbound, PUBLIC_RULE, heatGuard, applyReview, defaultDevice, writeGateway, TOOLS, runnable, deterministicNext, planView, newMemory, lookupHistory, TODAY, MONTH_DAYS };

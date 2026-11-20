@@ -86,13 +86,14 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
 
   function log(kind, text) { audit.unshift({ t: new Date().toLocaleTimeString('en-GB'), kind: kind, text: text }); renderAudit(); }
 
+  var edits = {};   // meter readings typed in by the user, per scenario
   function pipeline(rec, note) {
     var req = rec.request, scn = rec.scenario;
     var nc = validateNote(note);
     if (!nc.ok) return { stage: 'note', nc: nc, guard: { status: 'BLOCKED', rule: 'injection_blocked', reason: nc.reason } };
     var feed = validateMeterRows(rec.rows, rec.now);
     if (!feed.ok) return { stage: 'feed', nc: nc, feed: feed, guard: heatGuard(req, {}) };
-    var out = run_leak_and_bill_forecaster(scn.id);
+    var out = run_leak_and_bill_forecaster(scn.id, rec.rows);
     var state = { occupied: rec.now.occupied, outdoor_c: rec.now.outdoor_c };
     var guard = heatGuard(req, Object.assign({}, state, { device: device }));
     return { stage: 'ok', nc: nc, feed: feed, leak: out.leak, bill: out.bill, guard: guard, state: state };
@@ -112,12 +113,13 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
     ALL_SCENARIOS.forEach(function (s) {
       h += '<button class="sc' + (s.id === curId ? ' on' : '') + '" data-id="' + s.id + '"><span class="n">' + s.id + '</span>' + esc(s.name) + '<small>' + esc(s.request.type.replace(/_/g, ' ').toLowerCase()) + '</small></button>';
     });
-    h += '<h2>DEMO CONTROLS</h2><button class="sc" id="resetDev">Reset the simulated building</button>';
+    h += '<h2>DEMO CONTROLS</h2><button class="sc" id="resetDev">Reset the simulated building</button><h2>TYPE A METER READING</h2><div class="mut">Water, litres per hour. Try -20 or 9999.</div><div><input id="eDay" type="number" value="10" min="1" max="31" style="width:3.2em"> day <input id="eHr" type="number" value="14" min="0" max="23" style="width:3.2em"> hour <input id="eVal" type="number" value="-20" style="width:5em"> L/h</div><button class="sc" id="setRead">Set this reading</button>';
     $('#list').innerHTML = h;
     Array.prototype.forEach.call(document.querySelectorAll('.sc[data-id]'), function (b) {
       b.addEventListener('click', function () { curId = +b.getAttribute('data-id'); curNote = ''; playground = null; lastResult = ''; render(); });
     });
-    $('#resetDev').addEventListener('click', function () { devices = {}; hist = {}; alerted = {}; lastResult = ''; log('reset', 'All simulated buildings reset to their defaults.'); render(); });
+    $('#setRead').addEventListener('click', function () { (edits[curId] = edits[curId] || []).push({ day: +$('#eDay').value, hour: +$('#eHr').value, v: +$('#eVal').value }); log('reading', 'Typed reading: day ' + $('#eDay').value + ', hour ' + $('#eHr').value + ', ' + $('#eVal').value + ' L/h.'); render(); });
+    $('#resetDev').addEventListener('click', function () { edits = {}; devices = {}; hist = {}; alerted = {}; lastResult = ''; log('reset', 'All simulated buildings reset to their defaults.'); render(); });
   }
 
   function nightChart(leak) {
@@ -148,7 +150,7 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
     h += '<div class="chips">';
     h += p.nc.ok ? '<span class="chip ok">note clean</span>' : '<span class="chip no">note rejected: ' + esc(p.nc.reason) + '</span>';
     if (p.feed) {
-      h += p.feed.ok ? '<span class="chip ok">meter feed passed (' + p.feed.rows + ' readings)</span>' : '<span class="chip no">meter feed untrusted: ' + esc(p.feed.issues.join('; ')) + '</span>';
+      h += p.feed.ok ? '<span class="chip ok">meter feed passed (' + p.feed.rows + ' readings' + (p.feed.set_aside ? '; ' + p.feed.set_aside + ' impossible reading(s) set aside and left out of the forecast: ' + esc(p.feed.set_aside_notes.join(' | ')) : '') + ')</span>' : '<span class="chip no">meter feed untrusted: ' + esc(p.feed.issues.join('; ')) + '</span>';
     } else h += '<span class="chip">meter feed not checked: stopped at the note</span>';
     return h + '</div></div>';
   }
@@ -244,6 +246,7 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
   function render() {
     renderList();
     var rec = get_local_meter_and_occupancy(curId), scn = rec.scenario;
+    (edits[curId] || []).forEach(function (e) { var r = rec.rows.filter(function (x) { return x.day === e.day && x.hour === e.hour; })[0]; if (r) r.water_lph = e.v; });
     device = devices[curId] || (devices[curId] = defaultDevice()); history = hist[curId] || (hist[curId] = []);
     var note = curNote !== '' ? curNote : (scn.note || '');
     var p = pipeline(rec, note);

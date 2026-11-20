@@ -89,6 +89,7 @@ JS_VALIDATE = CORE + r"""
 const sd = $getWorkflowStaticData('global'); sd.mem = sd.mem || newMemory(); const mem = sd.mem;
 const sel = String($json['Scenario'] || '').trim();
 const noteIn = String($json['Operator note'] || '');
+const readIn = String($json['Meter reading (day, hour, L/h)'] || '').split(',').map(x => parseFloat(x.trim()));
 const st = { run_id: 'ES-' + Date.now().toString(36).toUpperCase(), trace: [], steps: 0, done: [], plan_log: [], egress_log: [], invalid: 0, llm_failures: 0, planner_mode: 'llm', note: '' };
 const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
 ev('human', 'input', { selection: sel, note_attached: !!noteIn.trim() });
@@ -110,6 +111,8 @@ const note = noteIn.trim() || scn.note || '';
 const nv = validateNote(note);
 ev('guard', 'input_validation', { note_checked: !!note, ok: nv.ok, reason: nv.reason || null, note: note.slice(0, 400) });
 Object.assign(st, { scenario: { id: scn.id, name: scn.name, desc: scn.desc }, request, note });
+st.edits = readIn.length === 3 && readIn.every(x => !isNaN(x)) ? [{ day: readIn[0], hour: readIn[1], v: readIn[2] }] : [];
+if (st.edits.length) ev('input', 'typed_meter_reading', st.edits[0]);
 if (!nv.ok) return reject(st.scenario, request, { status: 'BLOCKED', rule: nv.rule, reason: nv.reason, suggested_setpoint_c: null });
 const dev = mem.devices[scn.id];
 st.device = dev ? JSON.parse(JSON.stringify(dev)) : defaultDevice();
@@ -177,13 +180,14 @@ const sd = $getWorkflowStaticData('global'); sd.mem = sd.mem || newMemory();
 const sid = st.scenario.id;
 if (TOOLS.indexOf(st.choice) < 0 || st.choice === 'finish') throw new Error('Tool not on the allow-list: ' + st.choice);
 if (st.choice === 'read_meter_data') {
-  const rec = get_local_meter_and_occupancy(sid), v = validateMeterRows(rec.rows, rec.now);
-  st.data = { ok: v.ok, issues: v.issues, rows: v.rows, bad_values: v.bad_values || 0, newest_age_hours: v.newest_age_hours };
+  const rec = get_local_meter_and_occupancy(sid); (st.edits || []).forEach(e => { const r = rec.rows.find(x => x.day === e.day && x.hour === e.hour); if (r) r.water_lph = e.v; }); const v = validateMeterRows(rec.rows, rec.now);
+  st.data = { ok: v.ok, issues: v.issues, rows: v.rows, bad_values: v.bad_values || 0, set_aside: v.set_aside || 0, set_aside_notes: v.set_aside_notes || [], newest_age_hours: v.newest_age_hours };
   st.state = v.ok ? { occupied: rec.now.occupied, outdoor_c: rec.now.outdoor_c } : null;
   ev('tool', 'read_meter_data', { stays_on_device: true, validation: st.data });
 } else if (st.choice === 'run_leak_and_bill_forecaster') {
-  const out = run_leak_and_bill_forecaster(sid); st.leak = out.leak; st.bill = out.bill;
-  ev('tool', 'run_leak_and_bill_forecaster', { leak: out.leak.verdict, est_lph: out.leak.est_lph, month_bill_aed: out.bill.with_leak.total_aed, tariff_verified: TARIFF.verified });
+  const rec2 = get_local_meter_and_occupancy(sid); (st.edits || []).forEach(e => { const r = rec2.rows.find(x => x.day === e.day && x.hour === e.hour); if (r) r.water_lph = e.v; });
+  const out = run_leak_and_bill_forecaster(sid, rec2.rows); st.leak = out.leak; st.bill = out.bill; st.set_aside = out.set_aside;
+  ev('tool', 'run_leak_and_bill_forecaster', { leak: out.leak.verdict, set_aside_readings: out.set_aside, est_lph: out.leak.est_lph, month_bill_aed: out.bill.with_leak.total_aed, tariff_verified: TARIFF.verified });
 } else if (st.choice === 'lookup_case_history') {
   st.history_info = lookupHistory(sd.mem, sid, st.request.type); ev('memory', 'lookup_case_history', st.history_info);
 } else if (st.choice === 'check_safety_guard') {
@@ -262,9 +266,16 @@ const system = 'You are the explainer inside EcoShield, a water and cooling savi
   'Write for a school manager: short sentences, plain words, no technical terms such as "guard", "gateway" or "allow-list"; say "safety rule" instead. ' +
   'Describe rules in words and never quote rule codes that contain underscores. Never suggest overriding, bypassing, relaxing or working around any safety rule, limit or approval, and never hint that a rule might allow the request later. If guard_status is BLOCKED, the only next step is that nothing was changed and a person decides. ' +
   'Reply with JSON only: {"headline":"<=12 words","explanation":"2-3 plain sentences: what was found and what it costs","tip":"one practical next step for a person"}.';
-const s = sanitize(buildOutbound(st.scenario, st.leak, st.bill, st.guard, st.request), 'groq (cloud LLM)');
-const user = JSON.stringify(s.payload);
-if (/occup|presence|room|people|schedule|empty/i.test(user)) throw new Error('Egress check failed: occupancy-like text in the outbound payload');
+let s, user, blocked = null;
+try {
+  s = sanitize(buildOutbound(st.scenario, st.leak, st.bill, st.guard, st.request), 'groq (cloud LLM)'); user = JSON.stringify(s.payload);
+  if (/occup|presence|room|people|schedule|empty/i.test(user)) throw new Error('occupancy-like text in the outbound payload');
+} catch (e) { blocked = String(e.message || e); }
+if (blocked) {
+  st.egress_blocked = blocked; try { st.outbound = buildOutbound(st.scenario, st.leak, st.bill, st.guard, st.request); } catch (_) { st.outbound = {}; }
+  st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor: 'privacy', step: 'egress_filter_failed', detail: { reason: blocked, action: 'no cloud call made; plain-code template used' } });
+  st.llm = null; return [{ json: st }];
+}
 st.outbound = s.payload; st.egress = s.egress;
 st.egress_log = st.egress_log.concat([Object.assign({ purpose: 'explain' }, s.egress)]);
 st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor: 'privacy', step: 'egress_filter', detail: s.egress });
@@ -305,7 +316,7 @@ if (provider !== 'template') {
       }
     } else why = 'AI reply missing fields';
   } catch (e) { why = 'AI reply was not valid JSON'; }
-} else why = 'No AI provider answered (Groq and Ollama both failed or timed out)';
+} else why = d.egress_blocked ? 'The privacy filter failed (' + d.egress_blocked + '), so nothing was sent to any AI: plain-code template used' : 'No AI provider answered (Groq and Ollama both failed or timed out)';
 const o = d.outbound, L = d.leak || { verdict: 'NOT_RUN' };
 const tmpl = {
   headline: L.verdict === 'LEAK' ? 'Probable leak: about ' + o.est_leak_lph + ' L/h flowing when the building is quiet' : (L.verdict === 'WATCH' ? 'Small constant night flow worth watching' : (L.verdict === 'INSUFFICIENT_DATA' ? 'Not enough meter data to judge leaks' : (L.verdict === 'NOT_RUN' ? 'No analysis possible: meter data rejected' : 'No leak found'))),
@@ -397,6 +408,8 @@ add("Console form", "n8n-nodes-base.formTrigger", {
     "formFields": {"values": [
         {"fieldLabel": "Scenario", "fieldType": "dropdown", "requiredField": True,
          "fieldOptions": {"values": [{"option": l} for l in SCENARIO_LABELS]}},
+        {"fieldLabel": "Meter reading (day, hour, L/h)", "fieldType": "text", "requiredField": False,
+         "placeholder": "Optional, e.g. 10,14,-20 sets day 10 hour 14 to -20 L/h. Impossible values are set aside."},
         {"fieldLabel": "Operator note", "fieldType": "textarea", "requiredField": False,
          "placeholder": "Optional note from an operator or automation. It is treated as data and checked for injection."}]},
     "options": {}}, 0, 300, version=2.2, webhookId=CONSOLE_FORM_ID)
@@ -422,6 +435,7 @@ groq_http("Groq explain", "$json.llm.groqBody", 30000, True, 2880, 200)
 groq_http("Groq 20B explain", "$('Build LLM prompt').first().json.llm.groq20Body", 30000, True, 2880, 300)
 ollama_http("Ollama explain", "$('Build LLM prompt').first().json.llm.ollamaBody", 90000, 2880, 400)
 code("Parse LLM", JS_PARSE_LLM, 3120, 200)
+if_true("Cloud call allowed?", "={{ !$json.egress_blocked }}", 2880, 120)
 if_true("Needs approval?", "={{ $json.guard.status === 'NEEDS_APPROVAL' }}", 3360, 200)
 add("Approval form", "n8n-nodes-base.form", {
     "formFields": {"values": [
@@ -492,7 +506,9 @@ link("Parse replan", "Replan check")
 link("Finished?", "Run tool", 1)
 link("Run tool", "Plan state")
 link("Auto actions", "Build LLM prompt")
-link("Build LLM prompt", "Groq explain")
+link("Build LLM prompt", "Cloud call allowed?")
+link("Cloud call allowed?", "Groq explain", 0)
+link("Cloud call allowed?", "Parse LLM", 1)
 link("Groq explain", "Parse LLM", 0)
 link("Groq explain", "Groq 20B explain", 1)
 link("Groq 20B explain", "Parse LLM", 0)
@@ -521,7 +537,7 @@ LAYOUT = {
     "Groq plan": (1300, 100), "Groq 20B plan": (1300, 300), "Ollama plan": (1300, 500), "Parse plan": (1560, 300), "Finished?": (1820, 300),
     "Run tool": (1820, -60), "Replan check": (2080, 300), "Replan needed?": (2340, 300),
     "Groq replan": (2600, -300), "Groq 20B replan": (2600, -120), "Ollama replan": (2600, 60), "Parse replan": (2860, -120),
-    "Auto actions": (2600, 300), "Build LLM prompt": (2860, 300),
+    "Auto actions": (2600, 300), "Build LLM prompt": (2860, 300), "Cloud call allowed?": (2990, 420),
     "Groq explain": (3120, 120), "Groq 20B explain": (3120, 300), "Ollama explain": (3120, 480), "Parse LLM": (3380, 300),
     "Needs approval?": (3640, 300), "Approval form": (3900, 100), "Approve and write": (4160, 100),
     "Needs review?": (3900, 500), "No write": (4160, 500), "Review form": (4160, 700), "Record review": (4420, 700),
