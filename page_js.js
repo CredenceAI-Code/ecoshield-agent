@@ -53,7 +53,10 @@ function glance(d) {
   else if (G.status === 'AUTO') dec = '<b>Low risk:</b> done automatically.';
   else dec = '<b>Allowed:</b> inside every safety limit.' + (d.request_original ? ' (A safer setpoint proposed by the AI passed the same check.)' : '') + ' A person must still approve it.';
   row('Code decided', dec);
-  if (d.auto && d.auto.status === 'DONE') row('Done automatically', 'Leak alert raised (logged, can be undone).');
+  if (d.evidence) row('Evidence strength', '<b>' + d.evidence.score + ' / 100 &middot; ' + esc(d.evidence.level) + '</b>' + (d.autonomy ? '. ' + esc(d.autonomy.text) : ''));
+  if (d.auto && d.auto.status === 'DONE') row(d.auto.approved_by ? 'Alert' : 'Done automatically', d.auto.approved_by ? 'Leak alert raised after ' + esc(d.auto.approved_by) + ' approved it (logged, can be undone).' : 'Leak alert raised (logged, can be undone).');
+  else if (d.auto && d.auto.status === 'HELD') row('Alert', 'Held: it waits for a named person to approve it.');
+  else if (d.auto && d.auto.status === 'WATCH_ONLY') row('Alert', 'Not raised: the evidence is too weak, so it is logged and watched.');
   let who;
   if (rv && rv.kind === 'replan_review') who = esc(rv.reviewer) + ' reviewed it after the AI\'s tries ran out: ' + esc(rv.decision) + '. No change was possible.';
   else if (rv) who = rv.approved ? '<b>Approved</b> by ' + esc(rv.reviewer) + '.' : '<b>Not approved</b> (' + esc(rv.reviewer) + ').';
@@ -80,6 +83,7 @@ function renderPage(d, opt) {
   let v = '';
   if (d.note) { const rej = d.gate === 'REJECT' && G.rule === 'injection_blocked'; v += '<p>Operator note: <i>&ldquo;' + esc(String(d.note).slice(0, 300)) + '&rdquo;</i></p><p>' + pill(rej ? 'REJECTED' : 'ACCEPTED as data', rej ? 'bad' : 'ok') + ' ' + (rej ? esc(G.reason) : 'It is logged but never treated as an instruction and never sent to an AI.') + '</p>'; }
   else v += '<p class="mut">No operator note attached.</p>';
+  if (d.rooms) { v += '<p><b>Room setpoints</b> (request: raise empty rooms to ' + d.roomReq.target + ' C' + (d.roomReq.offline.length ? '; sensor offline: ' + d.roomReq.offline.join(', ') : '') + ')</p><ul>'; d.rooms.forEach(function (r) { v += '<li><b>' + r.room + '</b>: ' + r.status + (r.setpoint_c !== null ? ' at ' + r.setpoint_c + ' C' : '') + '. ' + r.reason + '</li>'; }); v += '</ul>'; }
   if (d.data) v += '<p>Meter feed: ' + pill(d.data.ok ? 'PASSED' : 'REJECTED', d.data.ok ? 'ok' : 'bad') + ' ' + d.data.rows + ' readings &middot; ' + (d.data.bad_values || 0) + ' impossible &middot; newest ' + d.data.newest_age_hours + ' h old</p>' + (d.data.issues && d.data.issues.length ? '<ul>' + d.data.issues.map(i => '<li>' + esc(i) + '</li>').join('') + '</ul>' : '');
   else v += '<p class="mut">Meter feed: not read (the input was rejected first).</p>';
   h += det('1 &middot; Input checks: the note and the meter data', v);
@@ -91,6 +95,12 @@ function renderPage(d, opt) {
     h += det('3 &middot; Leak check', '<div class="big">' + pill(L.verdict, vk) + '</div><p>' + esc(L.reason) + '</p>' + (L.verdict === 'LEAK' ? '<p><b>' + L.est_lph + ' L/h</b> &asymp; <b>' + n0(L.est_litres_per_day) + ' L/day</b>. First seen day ' + L.first_seen.day + ', ' + String(L.first_seen.hour).padStart(2, '0') + ':00.</p>' : '') +
       '<table><tr><th>Night (01:00–05:00, unoccupied)</th><th class="r">Lowest flow</th><th class="r"></th></tr>' + (L.nights || []).slice(-7).map(n => '<tr><td>Day ' + n.day + '</td><td class="r">' + n.min + ' L/h</td><td class="r">' + (n.min >= 10 ? 'flagged' : '') + '</td></tr>').join('') + '</table>'); }
   else h += det('3 &middot; Leak check', '<p class="mut">Not run' + (d.data && !d.data.ok ? ': the feed failed validation, so no verdict is honest.' : '.') + '</p>');
+  // 3b evidence strength -> autonomy level (all code)
+  if (d.evidence) { const E = d.evidence, A = d.autonomy || {}, ek = { HIGH: 'ok', MEDIUM: 'warn', LOW: 'bad' }[E.level] || 'warn';
+    h += det('3b &middot; Evidence strength and autonomy level (code decides how much the agent may do alone)', '<div class="big">' + E.score + ' / 100 ' + pill(E.level, ek) + '</div>' +
+      (E.reasons.length ? '<table><tr><th>What weakened the evidence</th><th class="r">Points lost</th></tr>' + E.reasons.map(r => '<tr><td>' + esc(r.why) + '</td><td class="r">&minus;' + r.points + '</td></tr>').join('') + '</table>' : '<p>Nothing weakened it: full night coverage, no impossible readings, fresh feed, clear signal.</p>') +
+      '<table style="margin-top:8px"><tr><th>Score</th><th>Autonomy</th><th>What the agent may do alone</th></tr><tr><td>85 and up</td><td>HIGH</td><td>raise the leak alert automatically</td></tr><tr><td>50 to 84</td><td>MEDIUM</td><td>hold the alert until a named person approves</td></tr><tr><td>under 50</td><td>LOW</td><td>raise nothing; log as insufficient evidence and watch</td></tr></table>' +
+      '<p class="tag">' + esc(A.text || '') + ' The AI never sees or changes this score: it is plain code over the meter data, and it can only make the agent more careful, never less.</p>'); }
   // 4 bill
   if (B) { const W = B.with_leak.water, E = B.with_leak.electricity;
     const slabRows = (steps, unit) => steps.map(s => '<tr><td>' + n0(s.from) + (s.to ? ' – ' + n0(s.to) : '+') + '</td><td class="r">' + n0(s.units) + ' ' + unit + '</td><td class="r">' + s.rate + '</td><td class="r">' + n2(s.cost) + '</td></tr>').join('');

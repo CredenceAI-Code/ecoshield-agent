@@ -89,6 +89,7 @@ JS_VALIDATE = CORE + r"""
 const sd = $getWorkflowStaticData('global'); sd.mem = sd.mem || newMemory(); const mem = sd.mem;
 const sel = String($json['Scenario'] || '').trim();
 const noteIn = String($json['Operator note'] || '');
+const offIn = String($json['Offline room sensor (name)'] || '').trim(), tgtIn = parseFloat($json['Raise all unoccupied rooms to (C)']);
 const readIn = String($json['Meter reading (day, hour, L/h)'] || '').split(',').map(x => parseFloat(x.trim()));
 const st = { run_id: 'ES-' + Date.now().toString(36).toUpperCase(), trace: [], steps: 0, done: [], plan_log: [], egress_log: [], invalid: 0, llm_failures: 0, planner_mode: 'llm', note: '' };
 const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
@@ -111,6 +112,7 @@ const note = noteIn.trim() || scn.note || '';
 const nv = validateNote(note);
 ev('guard', 'input_validation', { note_checked: !!note, ok: nv.ok, reason: nv.reason || null, note: note.slice(0, 400) });
 Object.assign(st, { scenario: { id: scn.id, name: scn.name, desc: scn.desc }, request, note });
+st.roomReq = (offIn || !isNaN(tgtIn)) ? { offline: offIn ? [offIn] : [], target: isNaN(tgtIn) ? 27 : tgtIn } : null;
 st.edits = readIn.length === 3 && readIn.every(x => !isNaN(x)) ? [{ day: readIn[0], hour: readIn[1], v: readIn[2] }] : [];
 if (st.edits.length) ev('input', 'typed_meter_reading', st.edits[0]);
 if (!nv.ok) return reject(st.scenario, request, { status: 'BLOCKED', rule: nv.rule, reason: nv.reason, suggested_setpoint_c: null });
@@ -186,12 +188,13 @@ if (st.choice === 'read_meter_data') {
   ev('tool', 'read_meter_data', { stays_on_device: true, validation: st.data });
 } else if (st.choice === 'run_leak_and_bill_forecaster') {
   const rec2 = get_local_meter_and_occupancy(sid); (st.edits || []).forEach(e => { const r = rec2.rows.find(x => x.day === e.day && x.hour === e.hour); if (r) r.water_lph = e.v; });
-  const out = run_leak_and_bill_forecaster(sid, rec2.rows); st.leak = out.leak; st.bill = out.bill; st.set_aside = out.set_aside;
-  ev('tool', 'run_leak_and_bill_forecaster', { leak: out.leak.verdict, set_aside_readings: out.set_aside, est_lph: out.leak.est_lph, month_bill_aed: out.bill.with_leak.total_aed, tariff_verified: TARIFF.verified });
+  const out = run_leak_and_bill_forecaster(sid, rec2.rows); st.leak = out.leak; st.bill = out.bill; st.set_aside = out.set_aside; st.evidence = out.evidence;
+  ev('tool', 'run_leak_and_bill_forecaster', { leak: out.leak.verdict, evidence_score: out.evidence.score, evidence_level: out.evidence.level, evidence_reasons: out.evidence.reasons, set_aside_readings: out.set_aside, est_lph: out.leak.est_lph, month_bill_aed: out.bill.with_leak.total_aed, tariff_verified: TARIFF.verified });
 } else if (st.choice === 'lookup_case_history') {
   st.history_info = lookupHistory(sd.mem, sid, st.request.type); ev('memory', 'lookup_case_history', st.history_info);
 } else if (st.choice === 'check_safety_guard') {
   st.guard = heatGuard(st.request, st.state ? Object.assign({}, st.state, { device: st.device }) : null);
+  if (st.roomReq) { st.rooms = planRoomSetpoints(st.roomReq.target, st.roomReq.offline); ev('guard', 'room_setpoints', { requested_c: st.roomReq.target, offline: st.roomReq.offline, rooms: st.rooms }); }
   ev('guard', 'heat_and_privacy_guard', { request: st.request, state: st.state, status: st.guard.status, rule: st.guard.rule, reason: st.guard.reason });
 }
 st.done = st.done.concat([st.choice]);
@@ -247,13 +250,20 @@ if (st.request.type !== 'ROLLBACK' && st.data && st.data.ok && ['LEAK', 'WATCH',
   if ((st.device.alerts || []).some(a => a.open && a.scenario === st.scenario.id)) {
     st.auto = { status: 'NO_CHANGE', text: 'A leak alert is already open for this scenario, so it was not raised again.' };
   } else {
+    // Adaptive autonomy: CODE maps the evidence score to what the agent may do alone (HIGH auto, MEDIUM a person approves, LOW watch only)
+    const aut = autonomyFor(st.evidence); st.autonomy = aut;
     const alert = { id: 'AL-' + st.run_id, scenario: st.scenario.id, verdict: v, est_lph: st.leak.est_lph || 0, at: new Date().toISOString(), open: true };
-    const req = { type: 'RAISE_ALERT', alert };
-    const g = heatGuard(req, Object.assign({}, st.state, { device: st.device }));
-    const gw = g.status === 'AUTO' ? writeGateway(req, st.state, st.device) : { ok: false, error: 'guard did not allow it', device: st.device, before: st.device };
-    if (gw.ok) { st.device = gw.device; st.auto = { status: 'DONE', alert, before: gw.before, after: gw.device }; } else st.auto = { status: 'FAILED', error: gw.error };
+    if (aut.alert === 'watch') st.auto = { status: 'WATCH_ONLY', text: aut.text };
+    else if (aut.alert === 'approve') st.auto = { status: 'HELD', text: aut.text, alert };
+    else {
+      const req = { type: 'RAISE_ALERT', alert };
+      const g = heatGuard(req, Object.assign({}, st.state, { device: st.device }));
+      const gw = g.status === 'AUTO' ? writeGateway(req, st.state, st.device) : { ok: false, error: 'guard did not allow it', device: st.device, before: st.device };
+      if (gw.ok) { st.device = gw.device; st.auto = { status: 'DONE', alert, before: gw.before, after: gw.device }; } else st.auto = { status: 'FAILED', error: gw.error };
+    }
+    ev('code', 'autonomy_level', { level: aut.level, alert_mode: aut.alert, evidence_score: st.evidence ? st.evidence.score : null, text: aut.text });
   }
-  ev('tool', 'auto_action', { verdict: v, result: st.auto.status, alert: st.auto.alert ? st.auto.alert.id : null, note: st.auto.text || st.auto.error || 'alert written through the gateway; snapshot kept for undo' });
+  ev('tool', 'auto_action', { verdict: v, result: st.auto.status, alert: st.auto.status === 'DONE' ? st.auto.alert.id : null, note: st.auto.text || st.auto.error || 'alert written through the gateway; snapshot kept for undo' });
 } else ev('code', 'auto_action', { skipped: true, reason: 'no leak verdict, or request is a rollback, or data untrusted' });
 return [{ json: st }];
 """
@@ -337,6 +347,12 @@ const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString()
 const rev = applyReview(f['Decision'], f['Reviewer'], f['Note (optional)']);
 ev('human', 'approval', { decision: String(f['Decision']), reviewer: rev.reviewer, approved: rev.approved, note: rev.note, comment: rev.comment });
 st.review = rev; st.write = null;
+if (rev.approved && st.auto && st.auto.status === 'HELD') {
+  // medium evidence: the held leak alert is raised only now, through the same gateway, on the named person's approval
+  const areq = { type: 'RAISE_ALERT', alert: st.auto.alert }, ag = writeGateway(areq, st.state, st.device);
+  if (ag.ok) { st.device = ag.device; st.auto = { status: 'DONE', alert: st.auto.alert, before: ag.before, after: ag.device, approved_by: rev.reviewer }; }
+  ev('human', 'alert_approval', { alert: st.auto.alert.id, raised: ag.ok, approved_by: rev.reviewer, error: ag.ok ? null : ag.error });
+}
 if (rev.approved) {
   st.write = writeGateway(st.request, st.state, st.device);
   ev('tool', 'write_gateway', { ok: st.write.ok, error: st.write.error || null, rolled_back: !!st.write.rolled_back, device_before: st.write.before, device_after: st.write.device });
@@ -410,6 +426,10 @@ add("Console form", "n8n-nodes-base.formTrigger", {
          "fieldOptions": {"values": [{"option": l} for l in SCENARIO_LABELS]}},
         {"fieldLabel": "Meter reading (day, hour, L/h)", "fieldType": "text", "requiredField": False,
          "placeholder": "Optional, e.g. 10,14,-20 sets day 10 hour 14 to -20 L/h. Impossible values are set aside."},
+        {"fieldLabel": "Offline room sensor (name)", "fieldType": "text", "requiredField": False,
+         "placeholder": "Optional, e.g. Exam Hall 2. That room is then assumed occupied and hot."},
+        {"fieldLabel": "Raise all unoccupied rooms to (C)", "fieldType": "text", "requiredField": False,
+         "placeholder": "Optional, e.g. 27. Rooms with a dead sensor are never raised."},
         {"fieldLabel": "Operator note", "fieldType": "textarea", "requiredField": False,
          "placeholder": "Optional note from an operator or automation. It is treated as data and checked for injection."}]},
     "options": {}}, 0, 300, version=2.2, webhookId=CONSOLE_FORM_ID)

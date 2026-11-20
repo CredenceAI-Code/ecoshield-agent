@@ -132,6 +132,14 @@ ok(C.heatGuard(sp(24), Object.assign({}, occ, { device: C.defaultDevice() })).st
   const r13 = C.get_local_meter_and_occupancy(13); ok(C.validateMeterRows(r13.rows, r13.now).ok && C.heatGuard(r13.request, { occupied: r13.now.occupied, outdoor_c: r13.now.outdoor_c, device: C.defaultDevice() }).rule === 'needs_approval', 'S13: exactly on the ceiling is allowed, still needs a person');
   const r14 = C.get_local_meter_and_occupancy(14), v14 = C.validateMeterRows(r14.rows, r14.now); ok(!v14.ok && v14.disagreements >= 6 && /disagree/.test(v14.issues.join(' ')) && v14.bad_values === 0, 'S14: two disagreeing meters reject the feed: ' + v14.issues.join(' | '));
   ok(C.validateMeterRows(C.get_local_meter_and_occupancy(2).rows, C.get_local_meter_and_occupancy(2).now).disagreements === 0, 'a feed with only one meter is not penalised');
+  { // HS-5.5: a dead room sensor means occupied and hot, so nothing is raised for that room
+    const a = C.planRoomSetpoints(27, []), b = C.planRoomSetpoints(27, ['Exam Hall 2']), g = (x, n) => x.find(r => r.room === n);
+    ok(g(a, 'Exam Hall 2').status === 'PROPOSED' && g(a, 'Exam Hall 2').setpoint_c === 27, 'HS-5.5: with the sensor online an empty hall can be proposed 27 C');
+    ok(g(b, 'Exam Hall 2').status === 'HELD' && g(b, 'Exam Hall 2').setpoint_c === 24 && g(b, 'Exam Hall 2').sensor === 'OFFLINE', 'HS-5.5: offline sensor holds the room at the 24 C ceiling');
+    ok(g(b, 'Exam Hall 1').status === 'HELD' && g(b, 'Library').status === 'PROPOSED', 'HS-5.5: occupied rooms stay held, other empty rooms can still be proposed');
+    ok(C.planRoomSetpoints(30, []).filter(r => r.status === 'PROPOSED').length === 0, 'HS-5.5: above the 27 C empty-room limit nothing is proposed');
+    ok(C.heatGuard({ type: 'COOLING_OFF' }, { occupied: 1, outdoor_c: null, device: { setpoint_c: 24, cooling: 'on', main_valve: 'open', alerts: [] } }).rule === 'cooling_off_in_heat', 'HS-5.5: missing outdoor temperature counts as hot');
+  }
   { // HS-5.3: one negative reading and one 9,999 L/h spike on a normal day are set aside, not alarmed on, and kept out of the bill
     const rec = C.get_local_meter_and_occupancy(5), base = C.run_leak_and_bill_forecaster(5), rows = rec.rows.map(x => Object.assign({}, x));
     rows.find(r => r.day === 10 && r.hour === 14).water_lph = -20; rows.find(r => r.day === 11 && r.hour === 9).water_lph = 9999;
@@ -163,6 +171,25 @@ ok(C.heatGuard(sp(24), Object.assign({}, occ, { device: C.defaultDevice() })).st
   ok(C.applyReplan(s7, null, null).rp_done === 'review' && C.applyReplan(s7, { action: 'NONE' }, 'groq').rp_done === 'review' && C.applyReplan(s7, null, 'groq').replans[0].result === 'unreadable', 'applyReplan: no AI / NONE -> review; unreadable counts as an attempt');
   const pv = C.sanitize(C.replanView(a1), 'groq'); ok(!/occup|presence|room|people|schedule|empty/i.test(JSON.stringify(pv.payload)) && pv.egress.stripped_fields.length === 0 && pv.payload.failed_proposals[0] === 29, 'replanView: passes the privacy filter whole, carries the failed proposal');
   const rv = C.recordReview('Escalate', ' Asha  Rao '); ok(rv.reviewer === 'Asha Rao' && rv.approved === false && C.recordReview('Escalate', '').reviewer === 'nobody', 'recordReview: never approves, blank name = nobody'); }
+
+// ---- evidence strength + adaptive autonomy (plain code; the AI never touches either) ----
+{ const ev = (id, f) => { const rec = C.get_local_meter_and_occupancy(id); const rows = f ? f(rec.rows.map(x => Object.assign({}, x))) : rec.rows; const q = C.quarantineBadReadings(rows); return C.evidenceStrength(q.rows, C.detectLeak(q.rows), q.set_aside.length, rec.now.hour); };
+  const e1 = ev(1), e4 = ev(4), e9 = ev(9);
+  ok(e1.score === 100 && e1.level === 'HIGH' && e1.reasons.length === 0, 'evidence: S1 clean strong leak = 100 HIGH, nothing deducted');
+  ok(e4.level === 'MEDIUM' && e4.score === 80 && e4.reasons[0].key === 'below_leak_rule', 'evidence: S4 small drip = 80 MEDIUM, reason listed');
+  ok(e9.level === 'LOW' && e9.score < 50 && e9.reasons.some(r => r.key === 'night_gap'), 'evidence: S9 missing hours = LOW, reason is the gap');
+  ok([e1, e4, e9].every(e => e.score === Math.max(0, 100 - e.reasons.reduce((a, r) => a + r.points, 0))), 'evidence: score always equals 100 minus the listed reasons (no hidden deductions)');
+  // monotonic: knocking out more night readings can never RAISE the score
+  const drop = (n) => (rows) => { let k = 0; rows.forEach(r => { if (r.occupied === 0 && r.hour >= 1 && r.hour <= 5 && r.day >= 15 && k < n) { r.water_lph = null; r.kwh = null; k++; } }); return rows; };
+  const sc = [0, 4, 8, 14, 22, 30].map(n => ev(1, drop(n)).score); ok(sc.every((v, i) => i === 0 || v <= sc[i - 1]), 'evidence: more missing readings never raise the score (' + sc.join(' >= ') + ')');
+  // injected impossible readings lower it, and a stale feed lowers it
+  ok(ev(1, (rows) => { rows[200].water_lph = -20; rows[300].water_lph = 9999; return rows; }).score < 100, 'evidence: impossible readings lower the score');
+  ok(C.evidenceStrength(C.get_local_meter_and_occupancy(1).rows.slice(0, -4), { verdict: 'LEAK', est_lph: 45, flagged_nights: 6, longest_run_hours: 80 }, 0, 14).reasons.some(r => r.key === 'stale_feed'), 'evidence: a stale feed lowers the score');
+  const A = (lvl) => C.autonomyFor({ level: lvl, score: 1 });
+  ok(A('HIGH').alert === 'auto' && A('MEDIUM').alert === 'approve' && A('LOW').alert === 'watch', 'autonomy: HIGH auto, MEDIUM a person approves, LOW watch only');
+  ok(C.autonomyFor(null).alert === 'watch' && C.autonomyFor({}).alert === 'watch', 'autonomy: no evidence score fails closed to watch only');
+  ok(Object.keys(C.buildOutbound(C.SCENARIOS[0], C.run_leak_and_bill_forecaster(1).leak, null, { rule: 'needs_approval', status: 'NEEDS_APPROVAL' }, { type: 'MAIN_WATER_SHUTOFF' })).every(k => !/evidence|autonomy/i.test(k)), 'autonomy: evidence score is not part of anything sent to an AI');
+  ok(C.ALL_SCENARIOS.filter(s => s.id <= 14).every(s => { const r = C.run_leak_and_bill_forecaster(s.id); return r.evidence && r.evidence.score >= 0 && r.evidence.score <= 100; }), 'evidence: every scenario scores 0 to 100'); }
 
 // ---- determinism ----
 ok(JSON.stringify(C.genScenario(C.SCENARIOS[0])) === JSON.stringify(C.genScenario(C.SCENARIOS[0])), 'dataset deterministic');

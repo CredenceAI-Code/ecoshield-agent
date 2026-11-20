@@ -131,12 +131,54 @@ function quarantineBadReadings(rows) {
   });
   return { rows: out, set_aside };
 }
+// HS-5.5: per-room setpoints. A room whose sensor is offline (or whose occupancy/temperature is missing) is assumed occupied and hot, so the 24 C occupied ceiling applies and nothing is raised for it.
+const ROOMS = [{ room: 'Exam Hall 1', occupied: 1, temp_c: 23.5 }, { room: 'Exam Hall 2', occupied: 0, temp_c: 26.0 }, { room: 'Library', occupied: 0, temp_c: 26.0 }, { room: 'Gym', occupied: 0, temp_c: 27.5 }, { room: 'Classroom A', occupied: 0, temp_c: 26.5 }];
+function planRoomSetpoints(target, offline) {
+  const L = LIMITS, off = (offline || []).map(x => String(x).trim().toLowerCase()).filter(Boolean);
+  return ROOMS.map(r => {
+    const dead = off.indexOf(r.room.toLowerCase()) >= 0 || r.occupied === null || r.occupied === undefined || r.temp_c === null || r.temp_c === undefined;
+    if (dead) return { room: r.room, sensor: 'OFFLINE', assumed: 'occupied and hot', status: 'HELD', setpoint_c: L.OCCUPIED_MAX_C, reason: 'Sensor offline, so the room is assumed occupied and hot. The ' + L.OCCUPIED_MAX_C + ' C ceiling applies and nothing is raised.' };
+    if (r.occupied) return { room: r.room, sensor: 'ok', status: 'HELD', setpoint_c: L.OCCUPIED_MAX_C, reason: 'Occupied, so the ' + L.OCCUPIED_MAX_C + ' C ceiling applies.' };
+    if (target > L.UNOCCUPIED_PRECOOL_MAX_C) return { room: r.room, sensor: 'ok', status: 'BLOCKED', setpoint_c: null, reason: target + ' C is above the ' + L.UNOCCUPIED_PRECOOL_MAX_C + ' C limit for empty rooms.' };
+    return { room: r.room, sensor: 'ok', status: 'PROPOSED', setpoint_c: target, reason: 'Empty and the sensor is online. Proposed ' + target + ' C, a person must approve.' };
+  });
+}
 function run_leak_and_bill_forecaster(id, rowsIn) {
   const rec = get_local_meter_and_occupancy(id); if (rec.error) return rec;
   const q = quarantineBadReadings(rowsIn || rec.rows);
   const leak = detectLeak(q.rows), bill = forecastBill(q.rows, leak, rec.now.hour);
   const slabs = bill.with_leak.electricity.steps.length;
-  return { scenario_id: +id, leak, bill, elec_slab_count: slabs, set_aside: q.set_aside };
+  return { scenario_id: +id, leak, bill, elec_slab_count: slabs, set_aside: q.set_aside, evidence: evidenceStrength(q.rows, leak, q.set_aside.length, rec.now.hour) };
+}
+
+// ---------- evidence strength + autonomy level (plain code; the AI never sees, sets or changes either) ----------
+// A verdict is not equally trustworthy on every feed. The score (0-100) starts at 100 and loses points for each weakness in the evidence;
+// every deduction is listed with its reason. Code then maps the score to how much the agent may do on its own.
+const EVIDENCE = { HIGH_MIN: 85, MEDIUM_MIN: 50 };
+function evidenceStrength(rows, leak, setAsideCount, nowHour) {
+  const L = LIMITS, parts = [];
+  const take = (key, pts, why) => { const p = Math.round(pts); if (p > 0) parts.push({ key, points: p, why }); };
+  let miss = 0, tot = 0;
+  for (let d = Math.max(1, TODAY - 7); d <= TODAY; d++) rows.filter(r => r.day === d && r.hour >= L.NIGHT_FIRST && r.hour <= L.NIGHT_LAST && r.occupied === 0).forEach(r => { tot++; if (r.water_lph === null) miss++; });
+  take('night_gap', Math.min(60, (tot ? miss / tot : 0) * 150), Math.round((tot ? miss / tot : 0) * 100) + '% of the night-time readings are missing');
+  take('bad_readings', Math.min(15, 5 * (setAsideCount || 0)), (setAsideCount || 0) + ' impossible reading(s) were set aside');
+  let dis = 0; rows.forEach(r => { if (typeof r.water_lph === 'number' && typeof r.water_b_lph === 'number' && Math.abs(r.water_lph - r.water_b_lph) > Math.max(5, 0.3 * Math.max(r.water_lph, r.water_b_lph))) dis++; });
+  take('meters_disagree', Math.min(30, dis * 5), 'the two water meters disagree on ' + dis + ' reading(s)');
+  const last = rows[rows.length - 1], age = last ? (TODAY - last.day) * 24 + (nowHour - last.hour) : 99;
+  take('stale_feed', Math.min(20, (age - 1) * 10), 'the newest reading is ' + age + ' hours old');
+  if (leak && leak.verdict === 'LEAK') {
+    if ((leak.flagged_nights || 0) < 3 && (leak.longest_run_hours || 0) < 48) take('short_history', (3 - (leak.flagged_nights || 0)) * 7, 'only ' + (leak.flagged_nights || 0) + ' flagged night(s) and a short unbroken run');
+    if ((leak.est_lph || 0) < 1.5 * L.LEAK_MIN_LPH) take('weak_signal', 10, 'the flow is close to the ' + L.LEAK_MIN_LPH + ' L/h leak rule');
+  } else if (leak && leak.verdict === 'WATCH') take('below_leak_rule', 20, 'a small flow below the ' + L.LEAK_MIN_LPH + ' L/h leak rule is a weaker signal');
+  const score = Math.max(0, 100 - parts.reduce((a, p) => a + p.points, 0));
+  return { score, level: score >= EVIDENCE.HIGH_MIN ? 'HIGH' : (score >= EVIDENCE.MEDIUM_MIN ? 'MEDIUM' : 'LOW'), reasons: parts, bands: 'HIGH from ' + EVIDENCE.HIGH_MIN + ', MEDIUM from ' + EVIDENCE.MEDIUM_MIN };
+}
+// How much the agent may do on its own at each level. No evidence score at all fails closed to "watch only".
+function autonomyFor(ev) {
+  if (!ev || !ev.level) return { level: 'NONE', alert: 'watch', text: 'No evidence score, so nothing is raised automatically.' };
+  if (ev.level === 'HIGH') return { level: 'HIGH', alert: 'auto', text: 'Evidence is strong (' + ev.score + '/100): the leak alert is raised automatically, logged and reversible.' };
+  if (ev.level === 'MEDIUM') return { level: 'MEDIUM', alert: 'approve', text: 'Evidence is moderate (' + ev.score + '/100): the alert is held until a named person approves.' };
+  return { level: 'LOW', alert: 'watch', text: 'Evidence is too weak (' + ev.score + '/100): no alert is raised. It is logged as insufficient evidence and watched.' };
 }
 
 // ---------- stage 2: validate and sanitise INPUT (before any model sees anything) ----------
@@ -222,7 +264,7 @@ function heatGuard(req, state) {
     if (!state.occupied && v > L.UNOCCUPIED_PRECOOL_MAX_C) return B('unoccupied_over_precool_ceiling', 'Pre-cooling an empty building may never be set above ' + L.UNOCCUPIED_PRECOOL_MAX_C + ' C. Requested ' + v + ' C.', L.UNOCCUPIED_PRECOOL_MAX_C);
     return null;
   };
-  const coolingOffBad = () => state.occupied && state.outdoor_c >= L.HEAT_OUTDOOR_C ? B('cooling_off_in_heat', 'Cooling cannot be switched off while people are inside and it is ' + state.outdoor_c + ' C outside (limit ' + L.HEAT_OUTDOOR_C + ' C).') : null;
+  const coolingOffBad = () => state.occupied && (state.outdoor_c === null || state.outdoor_c === undefined || state.outdoor_c >= L.HEAT_OUTDOOR_C) ? B('cooling_off_in_heat', 'Cooling cannot be switched off while people are inside and it is ' + state.outdoor_c + ' C outside (limit ' + L.HEAT_OUTDOOR_C + ' C).') : null;
   let blocked = null;
   if (req.type === 'SETPOINT') blocked = checkSetpoint(req.setpoint_c);
   if (req.type === 'COOLING_OFF') blocked = coolingOffBad();
@@ -348,4 +390,4 @@ function lookupHistory(mem, sid, reqType) {
   return { open_alert: (dev.alerts || []).some(a => a.open), last_decision: dec, prior_runs: (mem.history || []).filter(h => h.scenario_id === sid).length };
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { quarantineBadReadings, LIMITS, TARIFF, SCENARIOS, EXTRA_SCENARIOS, ALL_SCENARIOS, MAX_STEPS, MAX_INVALID_PICKS, MAX_REPLANS, REPLANNABLE, needsReplan, replanView, parseReplan, applyReplan, recordReview, genScenario, get_local_meter_and_occupancy, detectLeak, slabCost, billFor, forecastBill, run_leak_and_bill_forecaster, validateNote, validateMeterRows, sanitize, buildOutbound, PUBLIC_RULE, heatGuard, applyReview, defaultDevice, writeGateway, TOOLS, runnable, deterministicNext, planView, newMemory, lookupHistory, TODAY, MONTH_DAYS };
+if (typeof module !== 'undefined' && module.exports) module.exports = { planRoomSetpoints, ROOMS, evidenceStrength, autonomyFor, EVIDENCE, quarantineBadReadings, LIMITS, TARIFF, SCENARIOS, EXTRA_SCENARIOS, ALL_SCENARIOS, MAX_STEPS, MAX_INVALID_PICKS, MAX_REPLANS, REPLANNABLE, needsReplan, replanView, parseReplan, applyReplan, recordReview, genScenario, get_local_meter_and_occupancy, detectLeak, slabCost, billFor, forecastBill, run_leak_and_bill_forecaster, validateNote, validateMeterRows, sanitize, buildOutbound, PUBLIC_RULE, heatGuard, applyReview, defaultDevice, writeGateway, TOOLS, runnable, deterministicNext, planView, newMemory, lookupHistory, TODAY, MONTH_DAYS };

@@ -60,8 +60,15 @@ const approve = (who) => () => ({ Decision: 'Approve', Reviewer: who });
     if (s.id === 12) ok(st.data && !st.data.ok && !st.plan_log.some(p => p.choice === 'run_leak_and_bill_forecaster'), 'S12: forecaster never ran on rejected data');
     if (s.id === 8) ok(st.bill.with_leak.electricity.steps.length >= 2, 'S8: slab crossed');
     // auto-action on leak verdicts
-    if (['LEAK', 'WATCH', 'INSUFFICIENT_DATA'].includes(E.leak)) ok(st.auto && st.auto.status === 'DONE' && mem().devices[s.id].alerts.length === 1, `S${s.id}: alert raised automatically`);
-    else ok(!st.auto || st.auto.status !== 'DONE', `S${s.id}: no alert when no leak verdict`);
+    // adaptive autonomy: HIGH evidence raises the alert alone, MEDIUM holds it until a named person approves (the sim approves), LOW raises nothing
+    if (['LEAK', 'WATCH', 'INSUFFICIENT_DATA'].includes(E.leak)) {
+      const lvl = st.evidence && st.evidence.level;
+      ok(lvl === ({ 1: 'HIGH', 3: 'HIGH', 4: 'MEDIUM', 9: 'LOW' })[s.id], `S${s.id}: evidence level ${lvl} (score ${st.evidence && st.evidence.score})`);
+      if (lvl === 'HIGH') ok(st.auto && st.auto.status === 'DONE' && !st.auto.approved_by && mem().devices[s.id].alerts.length === 1, `S${s.id}: HIGH evidence: alert raised automatically`);
+      else if (lvl === 'MEDIUM') ok(st.auto && st.auto.status === 'DONE' && st.auto.approved_by && mem().devices[s.id].alerts.length === 1 && st.trace.some(t => t.step === 'alert_approval' && t.actor === 'human'), `S${s.id}: MEDIUM evidence: alert raised only after a named person approved`);
+      else ok(st.auto && st.auto.status === 'WATCH_ONLY' && mem().devices[s.id].alerts.length === 0, `S${s.id}: LOW evidence: no alert raised, watched only`);
+      ok(st.trace.some(t => t.step === 'autonomy_level' && t.actor === 'code'), `S${s.id}: autonomy level decided by code and logged`);
+    } else ok(!st.auto || st.auto.status !== 'DONE', `S${s.id}: no alert when no leak verdict`);
     // device state after approval
     if (s.id === 1) ok(mem().devices[1].main_valve === 'closed', 'S1: valve closed after approval');
     if (s.id === 2) ok(mem().devices[2].setpoint_c === 23, 'S2: setpoint 23 persisted');
@@ -178,6 +185,28 @@ const approve = (who) => () => ({ Decision: 'Approve', Reviewer: who });
   await go('RESET - clear the demo memory'); r = await go(label(6), { explain: 'bypass', replan: () => 'garbage' }); ok(!d(r).ai.from_ai && /getting around/.test(d(r).ai.note) && !/temporary override/.test(page(r)), 'AI text that suggests an override is discarded');
   await go('RESET - clear the demo memory'); r = await go(label(1), { explain: 'invent' }); ok(!d(r).ai.from_ai && /never given/.test(d(r).ai.note), 'invented number: AI text discarded');
   await go('RESET - clear the demo memory'); r = await go(label(1), { explain: 'fail' }); ok(d(r).ai.provider === 'ollama' && d(r).ai.from_ai, 'Groq down: Ollama explains');
+
+  // adaptive autonomy edge cases: a MEDIUM alert stays held when the person does not approve; a LOW case never reaches the gateway
+  await go('RESET - clear the demo memory');
+  r = await go(label(4), {}, () => ({ Decision: 'Reject', Reviewer: 'Asha' }));
+  ok(d(r).auto.status === 'HELD' && mem().devices[4].alerts.length === 0 && !d(r).trace.some(t => t.step === 'alert_approval'), 'MEDIUM evidence, person rejects: the alert stays held and nothing is written');
+  ok(/Held: it waits for a named person/.test(page(r)) && /Evidence strength/.test(page(r)) && /3b/.test(page(r)), 'result page shows the held alert, the evidence row and the evidence card');
+  r = await go(label(4), {}, () => ({ Decision: 'Approve', Reviewer: ' ' }));
+  ok(d(r).auto.status === 'HELD' && mem().devices[4].alerts.length === 0, 'MEDIUM evidence, approval with no name: ignored, alert stays held');
+  r = await go(label(9));
+  ok(d(r).auto.status === 'WATCH_ONLY' && mem().devices[9].alerts.length === 0 && /Not raised: the evidence is too weak/.test(page(r)), 'LOW evidence: nothing raised, page says so');
+  ok(r.httpLog.every(h => !/evidence|autonomy/i.test(JSON.stringify(h.body))), 'LOW evidence run: the score never appears in any AI request body');
+
+  // HS-5.5: room sensor offline -> that room is assumed occupied and hot, nothing is raised for it; the other empty rooms can be proposed 27 C
+  await go('RESET - clear the demo memory');
+  r = await eng.run('Console form', { Scenario: label(2), 'Offline room sensor (name)': 'Exam Hall 2', 'Raise all unoccupied rooms to (C)': '27', 'Operator note': '' }, { http: stub({}), approval: approve('Akash') });
+  { const rm = d(r).rooms || [], g = (n) => rm.find(x => x.room === n) || {};
+    ok(g('Exam Hall 2').status === 'HELD' && g('Exam Hall 2').setpoint_c === 24 && g('Exam Hall 2').sensor === 'OFFLINE', 'HS-5.5 workflow: offline Exam Hall 2 is held at 24 C, not raised');
+    ok(g('Library').status === 'PROPOSED' && g('Library').setpoint_c === 27 && g('Exam Hall 1').status === 'HELD', 'HS-5.5 workflow: online empty rooms proposed 27 C, the occupied hall stays held');
+    ok(/Room setpoints/.test(page(r)) && /Exam Hall 2/.test(page(r)) && d(r).trace.some(t => t.step === 'room_setpoints'), 'HS-5.5 workflow: page and audit trail show the per-room decisions');
+    ok(r.httpLog.every(h => !/Exam Hall|room_setpoints/i.test(JSON.stringify(h.body))), 'HS-5.5 workflow: room names never appear in any AI request body'); }
+  r = await eng.run('Console form', { Scenario: label(2), 'Raise all unoccupied rooms to (C)': '30', 'Operator note': '' }, { http: stub({}), approval: approve('Akash') });
+  ok((d(r).rooms || []).every(x => x.status !== 'PROPOSED'), 'HS-5.5 workflow: 30 C is above the empty-room limit, so no room is proposed');
 
   // typed notes: benign passes, malicious blocked before any AI call
   await go('RESET - clear the demo memory');
