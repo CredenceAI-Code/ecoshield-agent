@@ -171,7 +171,7 @@ Tell these as stories: they show real engineering and honesty.
 - Bill forecast is a **naive projection**, not a prediction.
 - Memory is n8n static data, not a database; **do one approval at a time** (two paused at once could overwrite memory; untested).
 - The audit log **does contain occupancy** locally; only the stripped payload goes to the cloud.
-- **Not built:** approval timeout default, conflict check between two actions, Cerebras/Gemini fallback links, Langfuse tracing, multi-agent (the manual says start simple; single agent is fine).
+- **Built in Round 3:** approval timeout with a safe default, CSV upload, failure drill. **Not built:** conflict check between two actions, Cerebras/Gemini fallback links, Langfuse tracing, multi-agent (the manual says start simple; single agent is fine).
 - The reviewer name is typed, not authenticated.
 
 **Still unanswered by the organisers (ask at the 9:00 briefing):**

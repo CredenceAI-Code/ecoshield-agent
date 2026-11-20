@@ -16,6 +16,16 @@ Built 2026-11-19. Synthetic meter data; tariff = DEWA's published rates (checked
 - Memory only persists for PUBLISHED (production) runs, not "Execute workflow" test runs in the editor.
 - Demo reset: pick "RESET - clear the demo memory" on the console form (devices reopened, history and undo stack emptied).
 
+## Round 3 additions (2026-11-21): from prototype to pilot
+No new nodes (still 38). New form fields and code paths in existing nodes:
+- **Meter CSV file** (console form, optional). Parsed and validated in plain code (`parseMeterCsv` in `core.js`) inside `2) Validate input`: needs `day,hour,water_lph,kwh,occupied,outdoor_c`; 24 to 600 rows, 120 KB max, day 1 to 30, hour 0 to 23, occupied 0/1, no duplicates, no binary. A bad file stops before any AI (rule `upload_rejected`). Only numeric columns are kept; the log records file name, size, rows and a fingerprint. Sample files: `data/round3_samples/`.
+- **Approval wait limit (minutes)** (default 15, 1 to 60). The two wait forms (`Approval form`, `Review form`) resume after the limit; no answer = nothing is written, log event `approval_timeout`.
+- **Failure drill** (dropdown). "Groq outage" makes both cloud model calls fail on purpose so the fallback chain is exercised; log event `failure_drill`.
+- Token counts (`tokens_in`, `tokens_out`) are now logged for every AI call.
+- Evidence: `data/round3_log_evidence.json(l)` (three safety cases with run IDs), `data/round3_measurements.md` (tokens, cost, latency from the audit log), `tests/batch/` (5-input back-to-back and burst runs). Demo: `ROUND3_DEMO_RUNBOOK.md`, `Pitch_Script_R3.md`.
+- New tests: `tests/test_r3.js` (41), `tests/live_r3.js`, `tests/batch_run.js`, `tests/evidence_r3.js`, `tests/measure_r3.js`.
+- Known limit found by the burst test: simultaneous runs share one memory (last one to finish wins). The audit log stays complete. Not built: HS-5.1 pool filling, HS-5.4 mid-month tariff change.
+
 ## The 10 stages of the reference diagram, and where each lives
 | # | Stage | Done by | What is built |
 |---|---|---|---|

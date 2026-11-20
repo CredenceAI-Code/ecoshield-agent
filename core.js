@@ -143,12 +143,61 @@ function planRoomSetpoints(target, offline) {
     return { room: r.room, sensor: 'ok', status: 'PROPOSED', setpoint_c: target, reason: 'Empty and the sensor is online. Proposed ' + target + ' C, a person must approve.' };
   });
 }
-function run_leak_and_bill_forecaster(id, rowsIn) {
+function run_leak_and_bill_forecaster(id, rowsIn, nowIn) {
   const rec = get_local_meter_and_occupancy(id); if (rec.error) return rec;
+  const now = nowIn || rec.now;
   const q = quarantineBadReadings(rowsIn || rec.rows);
-  const leak = detectLeak(q.rows), bill = forecastBill(q.rows, leak, rec.now.hour);
+  const leak = detectLeak(q.rows), bill = forecastBill(q.rows, leak, now.hour);
   const slabs = bill.with_leak.electricity.steps.length;
-  return { scenario_id: +id, leak, bill, elec_slab_count: slabs, set_aside: q.set_aside, evidence: evidenceStrength(q.rows, leak, q.set_aside.length, rec.now.hour) };
+  return { scenario_id: +id, leak, bill, elec_slab_count: slabs, set_aside: q.set_aside, evidence: evidenceStrength(q.rows, leak, q.set_aside.length, now.hour) };
+}
+
+// ---------- Round 3: the real trigger. A meter export (CSV) replaces the canned scenario data ----------
+// Only a fixed list of numeric columns survives parsing; every other column and every text cell is dropped, so a file cannot smuggle instructions in.
+// Structural problems reject the whole file with a reason. Impossible VALUES (negative flow, 9,999 kWh) are not rejected here: they go on to the
+// existing quarantine, which sets them aside and lowers the evidence score, exactly as for the canned feeds.
+const CSV_LIMITS = { MAX_BYTES: 120000, MAX_ROWS: 600, MIN_ROWS: 24 };
+const CSV_REQUIRED = ['day', 'hour', 'water_lph', 'kwh', 'occupied', 'outdoor_c'], CSV_OPTIONAL = ['setpoint_c', 'water_b_lph'];
+function fingerprint(text) { let h = 0x811c9dc5; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
+function parseMeterCsv(text, filename) {
+  const fail = (reason) => ({ ok: false, reason, filename: filename || null });
+  text = String(text === undefined || text === null ? '' : text).replace(/^﻿/, '');
+  if (!text.trim()) return fail('the file is empty');
+  if (text.length > CSV_LIMITS.MAX_BYTES) return fail('the file is larger than ' + Math.round(CSV_LIMITS.MAX_BYTES / 1000) + ' KB');
+  if (text.indexOf('\u0000') >= 0) return fail('the file is not plain text');
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+  const head = lines[0].split(',').map(x => x.trim().toLowerCase());
+  const missing = CSV_REQUIRED.filter(c => head.indexOf(c) < 0);
+  if (missing.length) return fail('missing column(s): ' + missing.join(', '));
+  const dataLines = lines.slice(1);
+  if (dataLines.length > CSV_LIMITS.MAX_ROWS) return fail('more than ' + CSV_LIMITS.MAX_ROWS + ' rows');
+  if (dataLines.length < CSV_LIMITS.MIN_ROWS) return fail('only ' + dataLines.length + ' rows; at least ' + CSV_LIMITS.MIN_ROWS + ' are needed');
+  const idx = {}; CSV_REQUIRED.concat(CSV_OPTIONAL).forEach(c => { idx[c] = head.indexOf(c); });
+  const rows = [], seen = new Set(); let nonNumeric = 0;
+  for (let i = 0; i < dataLines.length; i++) {
+    const cells = dataLines[i].split(',').map(x => x.trim());
+    const cell = (c) => idx[c] < 0 ? undefined : cells[idx[c]];
+    const num = (c) => { const v = cell(c); if (v === undefined) return undefined; if (v === '' || /^(null|na|n\/a|nan)$/i.test(v)) return null; const n = Number(v); if (!isFinite(n)) { nonNumeric++; return null; } return n; };
+    const r = { day: num('day'), hour: num('hour'), water_lph: num('water_lph'), kwh: num('kwh'), occupied: num('occupied'), outdoor_c: num('outdoor_c') };
+    if (idx.setpoint_c >= 0) r.setpoint_c = num('setpoint_c');
+    if (idx.water_b_lph >= 0) r.water_b_lph = num('water_b_lph');
+    if (!Number.isInteger(r.day) || r.day < 1 || r.day > MONTH_DAYS) return fail('row ' + (i + 2) + ': day must be a whole number from 1 to ' + MONTH_DAYS);
+    if (!Number.isInteger(r.hour) || r.hour < 0 || r.hour > 23) return fail('row ' + (i + 2) + ': hour must be a whole number from 0 to 23');
+    if (r.occupied !== 0 && r.occupied !== 1) return fail('row ' + (i + 2) + ': occupied must be 0 or 1');
+    const key = r.day + ':' + r.hour; if (seen.has(key)) return fail('row ' + (i + 2) + ': duplicate reading for day ' + r.day + ' hour ' + r.hour); seen.add(key);
+    rows.push(r);
+  }
+  if (nonNumeric > Math.max(5, rows.length * 0.1)) return fail(nonNumeric + ' cells are not numbers');
+  rows.sort((a, b) => a.day - b.day || a.hour - b.hour);
+  const last = rows[rows.length - 1];
+  const now = { day: TODAY, hour: last.day === TODAY ? Math.min(23, last.hour + 1) : 14, occupied: last.occupied, outdoor_c: typeof last.outdoor_c === 'number' ? last.outdoor_c : 35 };
+  return { ok: true, rows, now, filename: filename || null, bytes: text.length, row_count: rows.length, non_numeric_cells: nonNumeric, fingerprint: fingerprint(text), last_reading: { day: last.day, hour: last.hour } };
+}
+// the record a tool reads: the uploaded file if there is one, otherwise the canned scenario
+function recordFor(st, id) {
+  const rec = get_local_meter_and_occupancy(id);
+  if (st && st.upload && st.upload.rows) { rec.rows = JSON.parse(JSON.stringify(st.upload.rows)); rec.now = st.upload.now; rec.source = 'uploaded_file'; } else rec.source = 'canned_scenario';
+  return rec;
 }
 
 // ---------- evidence strength + autonomy level (plain code; the AI never sees, sets or changes either) ----------
@@ -390,4 +439,4 @@ function lookupHistory(mem, sid, reqType) {
   return { open_alert: (dev.alerts || []).some(a => a.open), last_decision: dec, prior_runs: (mem.history || []).filter(h => h.scenario_id === sid).length };
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { planRoomSetpoints, ROOMS, evidenceStrength, autonomyFor, EVIDENCE, quarantineBadReadings, LIMITS, TARIFF, SCENARIOS, EXTRA_SCENARIOS, ALL_SCENARIOS, MAX_STEPS, MAX_INVALID_PICKS, MAX_REPLANS, REPLANNABLE, needsReplan, replanView, parseReplan, applyReplan, recordReview, genScenario, get_local_meter_and_occupancy, detectLeak, slabCost, billFor, forecastBill, run_leak_and_bill_forecaster, validateNote, validateMeterRows, sanitize, buildOutbound, PUBLIC_RULE, heatGuard, applyReview, defaultDevice, writeGateway, TOOLS, runnable, deterministicNext, planView, newMemory, lookupHistory, TODAY, MONTH_DAYS };
+if (typeof module !== 'undefined' && module.exports) module.exports = { planRoomSetpoints, ROOMS, evidenceStrength, autonomyFor, EVIDENCE, quarantineBadReadings, LIMITS, TARIFF, SCENARIOS, EXTRA_SCENARIOS, ALL_SCENARIOS, MAX_STEPS, MAX_INVALID_PICKS, MAX_REPLANS, REPLANNABLE, needsReplan, replanView, parseReplan, applyReplan, recordReview, genScenario, get_local_meter_and_occupancy, detectLeak, slabCost, billFor, forecastBill, run_leak_and_bill_forecaster, validateNote, validateMeterRows, sanitize, buildOutbound, PUBLIC_RULE, heatGuard, applyReview, defaultDevice, writeGateway, TOOLS, runnable, deterministicNext, planView, newMemory, lookupHistory, TODAY, MONTH_DAYS, parseMeterCsv, recordFor, fingerprint, CSV_LIMITS };

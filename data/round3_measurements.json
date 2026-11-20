@@ -1,0 +1,383 @@
+{
+  "summary": {
+    "generated": "2026-11-20T21:08:17.868Z",
+    "since": "2026-11-20T20:50:01Z",
+    "runs_counted": 31,
+    "runs_by_provider": {
+      "groq-20b": 31
+    },
+    "prices_usd_per_million": {
+      "groq": {
+        "in": 0.15,
+        "out": 0.6,
+        "model": "openai/gpt-oss-120b"
+      },
+      "groq-20b": {
+        "in": 0.075,
+        "out": 0.3,
+        "model": "openai/gpt-oss-20b"
+      }
+    },
+    "price_source": "console.groq.com/docs/models, read 2026-11-21, page undated; cached-input price not published",
+    "tokens_per_request": {
+      "median_in": 1083,
+      "median_out": 211,
+      "median_total": 1301,
+      "p95_total": 1345,
+      "max_total": 1680
+    },
+    "ai_calls_per_request": {
+      "median": 3,
+      "max": 4
+    },
+    "cost_usd_per_request": {
+      "median": 0.0001464,
+      "p95": 0.00019995,
+      "max": 0.0002103,
+      "note": "cloud calls only; local-model calls cost nothing; every run that used Groq is counted at the price of the Groq model that answered"
+    },
+    "latency_machine_seconds": {
+      "median": 4.378,
+      "p95": 6.724,
+      "max": 9.936,
+      "definition": "time the system itself took, from the form submission to the result, with the time spent waiting for a human to answer taken out"
+    },
+    "latency_machine_seconds_groq_only": {
+      "median": 4.378,
+      "p95": 6.724
+    },
+    "projection_assumptions": "requests per day are assumptions for a pilot, not measurements",
+    "projection": [
+      {
+        "requests_per_day": 10,
+        "usd_per_day": 0.0015,
+        "usd_per_month_30d": 0.044,
+        "tokens_per_day": 13010
+      },
+      {
+        "requests_per_day": 50,
+        "usd_per_day": 0.0073,
+        "usd_per_month_30d": 0.22,
+        "tokens_per_day": 65050
+      },
+      {
+        "requests_per_day": 500,
+        "usd_per_day": 0.0732,
+        "usd_per_month_30d": 2.196,
+        "tokens_per_day": 650500
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "ES-MWPGFL3P",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1095,
+      "tokens_out": 239,
+      "cost_usd": 0.00019995,
+      "machine_seconds": 3.892,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGGE4A",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1096,
+      "tokens_out": 214,
+      "cost_usd": 0.00014639999999999998,
+      "machine_seconds": 4.428,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGGNNX",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1079,
+      "tokens_out": 204,
+      "cost_usd": 0.00018525,
+      "machine_seconds": 4.378,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGGX7I",
+      "provider": "groq-20b",
+      "ai_calls": 2,
+      "tokens_in": 767,
+      "tokens_out": 185,
+      "cost_usd": 0.000113025,
+      "machine_seconds": 3.139,
+      "approval": false
+    },
+    {
+      "run_id": "ES-MWPGJS4H",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1095,
+      "tokens_out": 229,
+      "cost_usd": 0.00019305,
+      "machine_seconds": 5.819999999999999,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGK81B",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1079,
+      "tokens_out": 183,
+      "cost_usd": 0.000135825,
+      "machine_seconds": 4.954000000000001,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGKM60",
+      "provider": "groq-20b",
+      "ai_calls": 2,
+      "tokens_in": 767,
+      "tokens_out": 153,
+      "cost_usd": 0.000103425,
+      "machine_seconds": 9.936,
+      "approval": false
+    },
+    {
+      "run_id": "ES-MWPGOM50",
+      "provider": "groq-20b",
+      "ai_calls": 2,
+      "tokens_in": 767,
+      "tokens_out": 185,
+      "cost_usd": 0.000113025,
+      "machine_seconds": 4.237,
+      "approval": false
+    },
+    {
+      "run_id": "ES-MWPGOLZN",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1095,
+      "tokens_out": 247,
+      "cost_usd": 0.00019845000000000003,
+      "machine_seconds": 5.851000000000001,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGOM4Q",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1079,
+      "tokens_out": 201,
+      "cost_usd": 0.00018435,
+      "machine_seconds": 5.541,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGQBQW",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1096,
+      "tokens_out": 211,
+      "cost_usd": 0.0001455,
+      "machine_seconds": 4.239999999999999,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGQQ71",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1079,
+      "tokens_out": 184,
+      "cost_usd": 0.00013612500000000002,
+      "machine_seconds": 3.8049999999999997,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGR559",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1095,
+      "tokens_out": 224,
+      "cost_usd": 0.00014932499999999998,
+      "machine_seconds": 5.267,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGRK7Z",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1079,
+      "tokens_out": 180,
+      "cost_usd": 0.00017414999999999998,
+      "machine_seconds": 5.494,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGS002",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1081,
+      "tokens_out": 234,
+      "cost_usd": 0.00015127499999999998,
+      "machine_seconds": 6.724,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGSF47",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1080,
+      "tokens_out": 197,
+      "cost_usd": 0.0001401,
+      "machine_seconds": 6.004,
+      "approval": false
+    },
+    {
+      "run_id": "ES-MWPGSQFJ",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1081,
+      "tokens_out": 171,
+      "cost_usd": 0.000132375,
+      "machine_seconds": 5.644,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGT4R7",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1083,
+      "tokens_out": 185,
+      "cost_usd": 0.000136725,
+      "machine_seconds": 3.827,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGTJ3D",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1083,
+      "tokens_out": 221,
+      "cost_usd": 0.00014752500000000002,
+      "machine_seconds": 4.224,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGTXD5",
+      "provider": "groq-20b",
+      "ai_calls": 4,
+      "tokens_in": 1378,
+      "tokens_out": 302,
+      "cost_usd": 0.00019394999999999997,
+      "machine_seconds": 5.284,
+      "approval": false
+    },
+    {
+      "run_id": "ES-MWPGUJVP",
+      "provider": "groq-20b",
+      "ai_calls": 2,
+      "tokens_in": 767,
+      "tokens_out": 184,
+      "cost_usd": 0.00011272499999999999,
+      "machine_seconds": 3.207,
+      "approval": false
+    },
+    {
+      "run_id": "ES-MWPGUXAH",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1081,
+      "tokens_out": 264,
+      "cost_usd": 0.0002103,
+      "machine_seconds": 4.132000000000001,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGVCRO",
+      "provider": "groq-20b",
+      "ai_calls": 2,
+      "tokens_in": 767,
+      "tokens_out": 165,
+      "cost_usd": 0.00010702499999999999,
+      "machine_seconds": 5.303,
+      "approval": false
+    },
+    {
+      "run_id": "ES-MWPGVO1R",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1096,
+      "tokens_out": 214,
+      "cost_usd": 0.00014639999999999998,
+      "machine_seconds": 3.835,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGVWU5",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1089,
+      "tokens_out": 169,
+      "cost_usd": 0.00013237499999999998,
+      "machine_seconds": 3.897,
+      "approval": false
+    },
+    {
+      "run_id": "ES-MWPGW2LO",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1084,
+      "tokens_out": 231,
+      "cost_usd": 0.0001506,
+      "machine_seconds": 3.617,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGWD19",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1084,
+      "tokens_out": 217,
+      "cost_usd": 0.0001464,
+      "machine_seconds": 5.455,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGWWRD",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1096,
+      "tokens_out": 232,
+      "cost_usd": 0.0001518,
+      "machine_seconds": 4.081,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGXAWZ",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1079,
+      "tokens_out": 183,
+      "cost_usd": 0.000135825,
+      "machine_seconds": 4.119,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGXZZG",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1096,
+      "tokens_out": 242,
+      "cost_usd": 0.0001548,
+      "machine_seconds": 4.191000000000001,
+      "approval": true
+    },
+    {
+      "run_id": "ES-MWPGYF6B",
+      "provider": "groq-20b",
+      "ai_calls": 3,
+      "tokens_in": 1096,
+      "tokens_out": 231,
+      "cost_usd": 0.0001515,
+      "machine_seconds": 4.446000000000001,
+      "approval": true
+    }
+  ]
+}

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+	<meta charset='UTF-8' />
+	<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+	<link rel='icon' type='image/png' href='https://n8n.io/favicon.ico' />
+	<link href='https://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css' />
+
+	<title>EcoShield console</title>
+
+	<style>
+		:root {
+			/* Fonts */
+			--font-family: 'Open Sans', sans-serif;
+			--font-weight-normal: 400;
+			--font-weight-bold: 600;
+			--font-size-body: 12px;
+			--font-size-link: 12px;
+			--font-size-header: 20px;
+			--font-size-subheader: 14px;
+
+			/* Colors */
+			--color-background: #FBFCFE;
+			--color-card-bg: white;
+			--color-card-border: #DBDFE7;
+			--color-card-shadow: #634DFF0F;
+			--color-link: #7E8186;
+			--color-header: #525356;
+			--color-header-subtext: #7E8186;
+
+			/* Spacing and dimensions */
+			--padding-container-top: 24px;
+			--container-width: 448px;
+			--card-padding: 24px;
+			--card-margin-bottom: 16px;
+			--card-border-radius: 8px;
+		}
+
+		*,
+		::after,
+		::before {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		body {
+			font-family: var(--font-family);
+			font-weight: var(--font-weight-normal);
+			font-size: var(--font-size-body);
+			display: flex;
+			flex-direction: column;
+			justify-content: start;
+			background-color: var(--color-background);
+		}
+
+		.container {
+			margin: auto;
+			text-align: center;
+			padding-top: var(--padding-container-top);
+			width: var(--container-width);
+		}
+
+		.card {
+			padding: var(--card-padding);
+			background-color: var(--color-card-bg);
+			border: 1px solid var(--color-card-border);
+			border-radius: var(--card-border-radius);
+			box-shadow: 0px 4px 16px 0px var(--color-card-shadow);
+			margin-bottom: var(--card-margin-bottom);
+		}
+
+		.n8n-link a {
+			color: var(--color-link);
+			font-weight: var(--font-weight-bold);
+			font-size: var(--font-size-link);
+			text-decoration: none;
+		}
+
+		.n8n-link svg {
+			display: inline-block;
+			vertical-align: middle;
+		}
+
+		.header h1 {
+			color: var(--color-header);
+			font-size: var(--font-size-header);
+			font-weight: var(--font-weight-normal);
+			padding-bottom: 8px;
+		}
+
+		.header p {
+			color: var(--color-header-subtext);
+			font-size: var(--font-size-subheader);
+			font-weight: var(--font-weight-normal);
+		}
+	</style>
+
+</head>
+
+	<body>
+			<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EcoShield result</title><style>:root{--bg:#f6f7f9;--card:#fff;--ink:#1b2430;--mut:#5d6b7c;--line:#dfe4ea;--ok:#13795b;--okb:#e3f5ee;--warn:#8a5a00;--warnb:#fff3d6;--bad:#b3261e;--badb:#fde8e6;--lnk:#1a5fb4}@media(prefers-color-scheme:dark){:root{--bg:#10151c;--card:#18202a;--ink:#e8edf3;--mut:#9aa8b8;--line:#2a3544;--ok:#5fd3a8;--okb:#12352b;--warn:#f0c36a;--warnb:#3a2e12;--bad:#ff8f86;--badb:#3d1a18;--lnk:#8ab4f8}}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif}.w{max-width:1000px;margin:0 auto;padding:20px 16px 48px}a{color:var(--lnk)}h1{font-size:22px;margin:0 0 2px}h2{font-size:14px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}.sub{color:var(--mut);margin:0 0 16px}.banner{padding:14px 16px;border-radius:10px;font-weight:600;margin:12px 0 16px}.banner.ok{background:var(--okb);color:var(--ok)}.banner.warn{background:var(--warnb);color:var(--warn)}.banner.bad{background:var(--badb);color:var(--bad)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:760px){.grid{grid-template-columns:1fr}}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}.full{grid-column:1/-1}.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700}.pill.ok{background:var(--okb);color:var(--ok)}.pill.warn{background:var(--warnb);color:var(--warn)}.pill.bad{background:var(--badb);color:var(--bad)}table{width:100%;border-collapse:collapse;font-size:13.5px}td,th{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--mut);font-weight:600}.r{text-align:right}.mono{font-family:Consolas,monospace}.sm{font-size:11.5px;color:var(--mut);word-break:break-all}pre{background:var(--bg);border:1px solid var(--line);padding:10px;border-radius:8px;overflow:auto;font-size:12px;margin:8px 0 0}.mut{color:var(--mut)}.big{font-size:26px;font-weight:700}details.dt{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:10px}details.dt>summary{cursor:pointer;font-weight:600;font-size:14px}details.dt[open]>summary{margin-bottom:10px}.gl td{padding:7px 6px}.gl td:first-child{width:150px;color:var(--mut);font-weight:600}.stack{margin-top:6px}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tag{font-size:12px;color:var(--mut)}.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}@media(max-width:760px){.tiles{grid-template-columns:1fr 1fr}}.tile b{display:block;font-size:24px}</style></head><body><div class="w"><h1>EcoShield &middot; Scenario 1: Overnight hidden pipe leak</h1><p class="sub">Steady 45 L/h at 2 AM while the block is empty, since day 17. &nbsp;|&nbsp; run ES-MWPGXZZG &nbsp;|&nbsp; SYNTHETIC data &nbsp;|&nbsp; tariff DEWA published rates (simplified) &nbsp;|&nbsp; <a href="/webhook/ecoshield-dashboard">Dashboard</a> &middot; <a href="http://localhost:5678/form/be2bf8f1-b886-4585-950c-82bcc0648882">Console</a></p><div class="banner warn">Not approved: no change was made</div><div class="stack"><div class="card full"><h2>In plain words</h2><table class="gl"><tr><td>Asked</td><td>Close the main water valve</td></tr><tr><td>Code decided</td><td><b>Allowed:</b> inside every safety limit. A person must still approve it.</td></tr><tr><td>Evidence strength</td><td><b>100 / 100 &middot; HIGH</b>. Evidence is strong (100/100): the leak alert is raised automatically, logged and reversible.</td></tr><tr><td>Done automatically</td><td>Leak alert raised (logged, can be undone).</td></tr><tr><td>Person</td><td><b>Not approved</b> (Akash).</td></tr><tr><td>Leak check</td><td><b>LEAK:</b> about 45 L/h (about 1,080 litres a day) while nobody was there.</td></tr><tr><td>Bill forecast</td><td><b>AED 903.33</b> this month; the leak adds about <b>AED 139.71</b></td></tr><tr><td>Privacy</td><td><b>Occupancy sent to a cloud AI: NO.</b> Only sanitised totals and decisions went out.</td></tr><tr><td>The AI's part</td><td>Chose the tool order and wrote the explanation below. It decided nothing.</td></tr></table></div></div><div class="stack"><div class="card full"><h2>Explanation (the AI wrote the words; it decided nothing)</h2><p class="tag">Written by Groq gpt-oss-20b (cloud fallback, sanitized data only) &middot; 650 tokens</p><p><b>Leak detected, high water cost</b></p><p>A leak of 45 litres per hour causes about 1,080 litres per day, adding AED 139.71 to the bill. Total water cost is AED 355.71, electricity cost AED 504.60, and the overall bill is AED 903.33. The figures use the DEWA published tariff.</p><p class="mut">Next step: Ask a manager to approve the main water shut‑off to stop the leak.</p></div></div><p class="tag" style="margin:14px 0 8px">Details for judges: click a line to open it. The audit trail at the bottom lists every step.</p><div class="stack"><details class="dt"><summary>1 &middot; Input checks: the note and the meter data</summary><p class="mut">No operator note attached.</p><p>Meter feed: <span class="pill ok">PASSED</span> 518 readings &middot; 0 impossible &middot; newest 1 h old</p></details><details class="dt"><summary>2 &middot; Planner loop: the AI picks the tool order, code enforces it</summary><table><tr><th>#</th><th>Allowed now</th><th>Chosen</th><th>By</th></tr><tr><td>1</td><td class="sm">read_meter_data</td><td class="mono">read_meter_data</td><td class="sm">only one tool was allowed, no AI call needed</td></tr><tr><td>2</td><td class="sm">run_leak_and_bill_forecaster, lookup_case_history, check_safety_guard</td><td class="mono">check_safety_guard</td><td class="sm">AI planner (groq-20b) &middot; &ldquo;Guard check required before shutdown&rdquo;</td></tr><tr><td>3</td><td class="sm">run_leak_and_bill_forecaster, lookup_case_history</td><td class="mono">lookup_case_history</td><td class="sm">AI planner (groq-20b) &middot; &ldquo;Check history before forecasting&rdquo;</td></tr><tr><td>4</td><td class="sm">run_leak_and_bill_forecaster</td><td class="mono">run_leak_and_bill_forecaster</td><td class="sm">only one tool was allowed, no AI call needed</td></tr><tr><td>5</td><td class="sm">finish</td><td class="mono">finish</td><td class="sm">only one tool was allowed, no AI call needed</td></tr></table><p class="tag">Steps 5 of 8 allowed &middot; invalid AI picks 0 of 2 allowed &middot; planner mode llm. The AI orders the tools; code decides what is allowed and when to stop.</p></details><details class="dt"><summary>3 &middot; Leak check</summary><div class="big"><span class="pill bad">LEAK</span></div><p>Water flow stayed at or above 10 L/h for hours when nobody was there (6 flagged nights, longest empty run 63 h). Estimated 45 L/h.</p><p><b>45 L/h</b> &asymp; <b>1,080 L/day</b>. First seen day 17, 00:00.</p><table><tr><th>Night (01:00–05:00, unoccupied)</th><th class="r">Lowest flow</th><th class="r"></th></tr><tr><td>Day 16</td><td class="r">0.3 L/h</td><td class="r"></td></tr><tr><td>Day 17</td><td class="r">44.8 L/h</td><td class="r">flagged</td></tr><tr><td>Day 18</td><td class="r">45.4 L/h</td><td class="r">flagged</td></tr><tr><td>Day 19</td><td class="r">44.1 L/h</td><td class="r">flagged</td></tr><tr><td>Day 20</td><td class="r">44.3 L/h</td><td class="r">flagged</td></tr><tr><td>Day 21</td><td class="r">45 L/h</td><td class="r">flagged</td></tr><tr><td>Day 22</td><td class="r">45.3 L/h</td><td class="r">flagged</td></tr></table></details><details class="dt"><summary>3b &middot; Evidence strength and autonomy level (code decides how much the agent may do alone)</summary><div class="big">100 / 100 <span class="pill ok">HIGH</span></div><p>Nothing weakened it: full night coverage, no impossible readings, fresh feed, clear signal.</p><table style="margin-top:8px"><tr><th>Score</th><th>Autonomy</th><th>What the agent may do alone</th></tr><tr><td>85 and up</td><td>HIGH</td><td>raise the leak alert automatically</td></tr><tr><td>50 to 84</td><td>MEDIUM</td><td>hold the alert until a named person approves</td></tr><tr><td>under 50</td><td>LOW</td><td>raise nothing; log as insufficient evidence and watch</td></tr></table><p class="tag">Evidence is strong (100/100): the leak alert is raised automatically, logged and reversible. The AI never sees or changes this score: it is plain code over the meter data, and it can only make the agent more careful, never less.</p></details><details class="dt"><summary>4 &middot; Bill forecast, slab by slab</summary><div class="big">AED 903.33</div><p class="mut">month so far + average of the last 14 full days x remaining days (a naive projection, not a prediction)</p><table><tr><th>Electricity slab (kWh)</th><th class="r">Units</th><th class="r">AED/kWh</th><th class="r">AED</th></tr><tr><td>0 – 2,000</td><td class="r">1,740 kWh</td><td class="r">0.23</td><td class="r">400.20</td></tr><tr><td colspan="3">Fuel surcharge</td><td class="r">104.40</td></tr></table><table style="margin-top:8px"><tr><th>Water slab (m&sup3;)</th><th class="r">Units</th><th class="r">AED/m&sup3;</th><th class="r">AED</th></tr><tr><td>0 – 45</td><td class="r">40 m&sup3;</td><td class="r">7.7</td><td class="r">311.25</td></tr><tr><td colspan="3">Fuel surcharge</td><td class="r">44.46</td></tr></table><p class="mut">Subtotal AED 860.31 + 5% VAT AED 43.02</p><p>Without the leak: AED 763.62. <b>The leak adds about AED 139.71.</b></p></details><details class="dt"><summary>5 &middot; Privacy: what left the laptop</summary><p><b>Occupancy sent to any cloud AI: NO.</b> Raw meter and occupancy rows never left this laptop.</p><table><tr><th>Call</th><th>To</th><th class="r">Fields</th><th class="r">Bytes</th></tr><tr><td>plan step 2</td><td class="sm">groq (planner)</td><td class="r">10</td><td class="r">304</td></tr><tr><td>plan step 3</td><td class="sm">groq (planner)</td><td class="r">10</td><td class="r">309</td></tr><tr><td>explain</td><td class="sm">groq (cloud LLM)</td><td class="r">18</td><td class="r">555</td></tr></table><p class="tag">Allow-list, not block-list. Last payload the AI was sent:</p><pre>{
+ &quot;scenario_id&quot;: 1,
+ &quot;leak_verdict&quot;: &quot;LEAK&quot;,
+ &quot;est_leak_lph&quot;: 45,
+ &quot;est_leak_litres_per_day&quot;: 1080,
+ &quot;leak_bill_impact_aed&quot;: 139.71,
+ &quot;bill_total_aed&quot;: 903.33,
+ &quot;water_cost_aed&quot;: 355.71,
+ &quot;electricity_cost_aed&quot;: 504.6,
+ &quot;elec_slabs_used&quot;: 1,
+ &quot;water_m3&quot;: 40.4,
+ &quot;electricity_kwh&quot;: 1740,
+ &quot;tariff_verified&quot;: true,
+ &quot;guard_rule&quot;: &quot;needs_human_approval&quot;,
+ &quot;guard_status&quot;: &quot;NEEDS_APPROVAL&quot;,
+ &quot;guard_reason&quot;: &quot;Inside every safety limit; a person must still approve.&quot;,
+ &quot;request_type&quot;: &quot;MAIN_WATER_SHUTOFF&quot;,
+ &quot;requested_setpoint_c&quot;: null,
+ &quot;task&quot;: &quot;Explain these already-computed results to a facilities manager.&quot;
+}</pre></details><details class="dt"><summary>6 &middot; Safety check, approval and write</summary><p>Request: <b>Close the main water valve</b></p><p><span class="pill warn">NEEDS APPROVAL</span> &nbsp;rule <span class="mono">needs_approval</span></p><p>Closing the main water valve always needs a person to approve.</p><p>Automatic action: <span class="pill ok">AUTO</span> leak alert <span class="mono">AL-ES-MWPGXZZG</span> raised through the write gateway. Logged and reversible (Undo).</p><p>Human decision: <b>Not approved</b> by Akash. Note: &ldquo;evidence run&rdquo;</p><p class="mut">Write gateway: nothing written for the request.</p></details><details class="dt"><summary>7 &middot; Memory, kept between runs</summary><p>Earlier runs of this scenario: <b>0</b> &middot; open alert before this run: <b>no</b></p><p>Earlier decision on this request: none</p><p>Building state after this run: Main valve <b>open</b> &middot; setpoint <b>24 °C</b> &middot; cooling <b>on</b> &middot; open alerts <b>1</b></p><p class="tag">Kept between runs and restarts. Undo and Reset are on the dashboard.</p></details><details class="dt"><summary>How the work was split (code / AI / human)</summary><div class="two"><div><b>Code decided</b><br>input validation &middot; leak verdict &middot; every slab and total &middot; what may leave the device &middot; whether the request is allowed &middot; which tools may run and when to stop &middot; the final write</div><div><b>AI did</b><br>chose the tool order (inside an allow-list) and wrote the explanation above from numbers it was handed. A wrong pick is overridden; an invented number discards its text.</div></div></details><details class="dt"><summary>Audit trail: 21 events, also saved to ecoshield_audit.jsonl</summary><table><tr><th>Time</th><th>Who</th><th>Step</th><th>Detail</th></tr><tr><td class="mono">21:05:59</td><td>human</td><td>input</td><td class="mono sm">{&quot;selection&quot;:&quot;1 - Overnight hidden pipe leak&quot;,&quot;note_attached&quot;:false}</td></tr><tr><td class="mono">21:05:59</td><td>guard</td><td>input_validation</td><td class="mono sm">{&quot;note_checked&quot;:false,&quot;ok&quot;:true,&quot;reason&quot;:null,&quot;note&quot;:&quot;&quot;}</td></tr><tr><td class="mono">21:05:59</td><td>input</td><td>meter_file</td><td class="mono sm">{&quot;source&quot;:&quot;uploaded_file&quot;,&quot;filename&quot;:&quot;leak_week.csv&quot;,&quot;bytes&quot;:12677,&quot;rows&quot;:518,&quot;non_numeric_cells&quot;:0,&quot;fingerprint&quot;:&quot;95db9eba&quot;}</td></tr><tr><td class="mono">21:05:59</td><td>memory</td><td>load_device_state</td><td class="mono sm">{&quot;device&quot;:{&quot;setpoint_c&quot;:24,&quot;cooling&quot;:&quot;on&quot;,&quot;main_valve&quot;:&quot;open&quot;,&quot;alerts&quot;:[]},&quot;prior_runs&quot;:0}</td></tr><tr><td class="mono">21:05:59</td><td>code</td><td>plan_step</td><td class="mono sm">{&quot;step&quot;:1,&quot;runnable&quot;:[&quot;read_meter_data&quot;],&quot;choice&quot;:&quot;read_meter_data&quot;,&quot;by&quot;:&quot;only one tool was allowed, no AI call needed&quot;,&quot;why&quot;:&quot;&quot;,&quot;tokens&quot;:null,&quot;tokens_in&quot;:null,&quot;tokens_out&quot;:null}</td></tr><tr><td class="mono">21:05:59</td><td>tool</td><td>read_meter_data</td><td class="mono sm">{&quot;stays_on_device&quot;:true,&quot;source&quot;:&quot;uploaded_file&quot;,&quot;validation&quot;:{&quot;ok&quot;:true,&quot;issues&quot;:[],&quot;rows&quot;:518,&quot;bad_values&quot;:0,&quot;set_aside&quot;:0,&quot;set_aside_notes&quot;:[],&quot;newest_age_hours&quot;:1}}</td></tr><tr><td class="mono">21:06:00</td><td>llm</td><td>plan_step</td><td class="mono sm">{&quot;step&quot;:2,&quot;runnable&quot;:[&quot;run_leak_and_bill_forecaster&quot;,&quot;lookup_case_history&quot;,&quot;check_safety_guard&quot;],&quot;choice&quot;:&quot;check_safety_guard&quot;,&quot;by&quot;:&quot;AI planner (groq-20b)&quot;,&quot;why&quot;:&quot;Guard check required before shutdown&quot;,&quot;tokens&quot;:354,&quot;tokens_in&quot;:299,&quot;tokens_out&quot;:55}</td></tr><tr><td class="mono">21:06:00</td><td>guard</td><td>heat_and_privacy_guard</td><td class="mono sm">{&quot;request&quot;:{&quot;type&quot;:&quot;MAIN_WATER_SHUTOFF&quot;},&quot;state&quot;:{&quot;occupied&quot;:1,&quot;outdoor_c&quot;:41.3},&quot;status&quot;:&quot;NEEDS_APPROVAL&quot;,&quot;rule&quot;:&quot;needs_approval&quot;,&quot;reason&quot;:&quot;Closing the main water valve always needs a person to approve.&quot;}</td></tr><tr><td class="mono">21:06:01</td><td>llm</td><td>plan_step</td><td class="mono sm">{&quot;step&quot;:3,&quot;runnable&quot;:[&quot;run_leak_and_bill_forecaster&quot;,&quot;lookup_case_history&quot;],&quot;choice&quot;:&quot;lookup_case_history&quot;,&quot;by&quot;:&quot;AI planner (groq-20b)&quot;,&quot;why&quot;:&quot;Check history before forecasting&quot;,&quot;tokens&quot;:334,&quot;tokens_in&quot;:300,&quot;tokens_out&quot;:34}</td></tr><tr><td class="mono">21:06:01</td><td>memory</td><td>lookup_case_history</td><td class="mono sm">{&quot;open_alert&quot;:false,&quot;last_decision&quot;:null,&quot;prior_runs&quot;:0}</td></tr><tr><td class="mono">21:06:01</td><td>code</td><td>plan_step</td><td class="mono sm">{&quot;step&quot;:4,&quot;runnable&quot;:[&quot;run_leak_and_bill_forecaster&quot;],&quot;choice&quot;:&quot;run_leak_and_bill_forecaster&quot;,&quot;by&quot;:&quot;only one tool was allowed, no AI call needed&quot;,&quot;why&quot;:&quot;&quot;,&quot;tokens&quot;:null,&quot;tokens_in&quot;:null,&quot;tokens_out&quot;:null}</td></tr><tr><td class="mono">21:06:01</td><td>tool</td><td>run_leak_and_bill_forecaster</td><td class="mono sm">{&quot;leak&quot;:&quot;LEAK&quot;,&quot;evidence_score&quot;:100,&quot;evidence_level&quot;:&quot;HIGH&quot;,&quot;evidence_reasons&quot;:[],&quot;set_aside_readings&quot;:[],&quot;est_lph&quot;:45,&quot;month_bill_aed&quot;:903.33,&quot;tariff_verified&quot;:true}</td></tr><tr><td class="mono">21:06:01</td><td>code</td><td>plan_step</td><td class="mono sm">{&quot;step&quot;:5,&quot;runnable&quot;:[&quot;finish&quot;],&quot;choice&quot;:&quot;finish&quot;,&quot;by&quot;:&quot;only one tool was allowed, no AI call needed&quot;,&quot;why&quot;:&quot;&quot;,&quot;tokens&quot;:null,&quot;tokens_in&quot;:null,&quot;tokens_out&quot;:null}</td></tr><tr><td class="mono">21:06:01</td><td>code</td><td>autonomy_level</td><td class="mono sm">{&quot;level&quot;:&quot;HIGH&quot;,&quot;alert_mode&quot;:&quot;auto&quot;,&quot;evidence_score&quot;:100,&quot;text&quot;:&quot;Evidence is strong (100/100): the leak alert is raised automatically, logged and reversible.&quot;}</td></tr><tr><td class="mono">21:06:01</td><td>tool</td><td>auto_action</td><td class="mono sm">{&quot;verdict&quot;:&quot;LEAK&quot;,&quot;result&quot;:&quot;DONE&quot;,&quot;alert&quot;:&quot;AL-ES-MWPGXZZG&quot;,&quot;note&quot;:&quot;alert written through the gateway; snapshot kept for undo&quot;}</td></tr><tr><td class="mono">21:06:01</td><td>privacy</td><td>egress_filter</td><td class="mono sm">{&quot;destination&quot;:&quot;groq (cloud LLM)&quot;,&quot;sent_fields&quot;:[&quot;scenario_id&quot;,&quot;leak_verdict&quot;,&quot;est_leak_lph&quot;,&quot;est_leak_litres_per_day&quot;,&quot;leak_bill_impact_aed&quot;,&quot;bill_total_aed&quot;,&quot;water_cost_aed&quot;,&quot;electricity_cost_aed&quot;,&quot;elec_slabs_used&quot;,&quot;water_m3&quot;,&quot;electricity_kwh&quot;,&quot;tariff_verified&quot;,&quot;guard_rule&quot;,&quot;guard_status&quot;,&quot;guard_reason&quot;,&quot;request_type&quot;,&quot;requested_setpoint_c&quot;,&quot;task&quot;],&quot;stripped_fields&quot;:[],&quot;bytes&quot;:555,&quot;occupancy_sent&quot;:false}</td></tr><tr><td class="mono">21:06:01</td><td>privacy</td><td>egress_assertion</td><td class="mono sm">{&quot;passed&quot;:true,&quot;outbound_bytes&quot;:555}</td></tr><tr><td class="mono">21:06:03</td><td>llm</td><td>explain</td><td class="mono sm">{&quot;provider_answered&quot;:&quot;groq-20b&quot;,&quot;groq_failed_over_to_ollama&quot;:false,&quot;tokens&quot;:650,&quot;tokens_in&quot;:497,&quot;tokens_out&quot;:153,&quot;used&quot;:&quot;ai_text&quot;,&quot;note&quot;:&quot;ok&quot;,&quot;words_only_no_decisions&quot;:true}</td></tr><tr><td class="mono">21:06:07</td><td>human</td><td>approval</td><td class="mono sm">{&quot;decision&quot;:&quot;Reject&quot;,&quot;reviewer&quot;:&quot;Akash&quot;,&quot;approved&quot;:false,&quot;note&quot;:&quot;&quot;,&quot;comment&quot;:&quot;evidence run&quot;}</td></tr><tr><td class="mono">21:06:07</td><td>tool</td><td>write_gateway</td><td class="mono sm">{&quot;skipped&quot;:true,&quot;reason&quot;:&quot;not approved by a named person&quot;}</td></tr><tr><td class="mono">21:06:07</td><td>memory</td><td>memory_commit</td><td class="mono sm">{&quot;committed&quot;:true,&quot;runs&quot;:1,&quot;undo_stack&quot;:1,&quot;device_now&quot;:{&quot;setpoint_c&quot;:24,&quot;cooling&quot;:&quot;on&quot;,&quot;main_valve&quot;:&quot;open&quot;,&quot;alerts&quot;:[{&quot;id&quot;:&quot;AL-ES-MWPGXZZG&quot;,&quot;scenario&quot;:1,&quot;verdict&quot;:&quot;LEAK&quot;,&quot;est_lph&quot;:45,&quot;at&quot;:&quot;2026-11-20T21:06:01.375Z&quot;,&quot;open&quot;:true}]}}</td></tr></table></details></div></div></body></html>
+	<script>
+		// Get signature from URL for fetch requests
+		const url = new URL(window.location.href);
+		const formSignature = url.searchParams.get('signature');
+
+		// Set only inside the n8n hosting shell's frame: the path prefix whose pages this
+		// page may hand to the host to navigate to. Empty everywhere else.
+		const hostNavigationPath = '';
+		const isShellHosted = window.parent !== window && !!hostNavigationPath;
+		
+		// True for this form's own follow-up pages, the only ones the shell will move to.
+		function isHostNavigable(target) {
+			if (!hostNavigationPath) return false;
+			try {
+				const here = new URL(window.location.href);
+				const resolved = new URL(target, here);
+				if (resolved.origin !== here.origin) return false;
+				return resolved.pathname === hostNavigationPath
+					|| resolved.pathname.startsWith(hostNavigationPath + '/');
+			} catch (e) {
+				return false;
+			}
+		}
+		
+		// Ask the host for a move this document can't make itself: inside the shell it is
+		// sandboxed to an opaque origin, so a navigation it starts counts as cross-site and
+		// the browser withholds the form's own auth cookie. The shell runs on the real
+		// origin, so the move it makes for us keeps the cookie. `type` says which move —
+		// another page of this form inside the frame, or the author's redirect for the tab.
+		function requestHostNavigation(type, target) {
+			// targetOrigin '*': an opaque-origin document cannot name its parent's origin,
+			// and the payload is only a URL the parent can already read.
+			window.parent.postMessage({ type, url: String(target) }, '*');
+		}
+		
+		// Move to another page of this form.
+		function navigateTo(target) {
+			if (isShellHosted && isHostNavigable(target)) requestHostNavigation('n8n-form-navigate', target);
+			else window.location.replace(target);
+		}
+		
+		// Leave for the redirect the form's author configured. The form is finished, so this
+		// takes the whole tab, which is where a form rendered without the shell ends up too.
+		function redirectTo(target) {
+			if (isShellHosted) requestHostNavigation('n8n-form-redirect', target);
+			else window.location.replace(target);
+		}
+
+		let interval = 1000;
+		let timeoutId;
+		const checkExecutionStatus = async () => {
+			if (!interval) return;
+
+			try {
+				const statusUrl = new URL(window.location.href);
+				statusUrl.pathname = statusUrl.pathname + '/n8n-execution-status';
+				// Include signature in fetch request for validation
+				if (formSignature) {
+					statusUrl.searchParams.set('signature', formSignature);
+				}
+				const response = await fetch(statusUrl.toString());
+				const text = (await response.text()).trim();
+
+				if (text === "form-waiting") {
+					// Redirect with signature in URL (will be cleaned after load)
+					const redirectUrl = new URL(window.location.href);
+					if (formSignature) {
+						redirectUrl.searchParams.set('signature', formSignature);
+					}
+					navigateTo(redirectUrl.toString());
+					return;
+				}
+
+				if(["canceled", "crashed", "error", "success", "null" ].includes(text)) {
+					interval = 0;
+					clearTimeout(timeoutId);
+					return;
+				}
+
+				interval = Math.round(interval * 1.1);
+				timeoutId = setTimeout(checkExecutionStatus, interval);
+			} catch (error) {
+				console.error("Error fetching data:", error);
+			}
+		};
+
+		document.addEventListener('DOMContentLoaded', function () {
+			const binaries = "%5B%5D"
+				?	JSON.parse(decodeURIComponent("%5B%5D"))
+				: [];
+
+			for (const binary of binaries) {
+				const byteArray = binary.data.type === 'Buffer'
+					? new Uint8Array(binary.data.data)
+					: Uint8Array.from(binary.data, c => c.charCodeAt(0));
+
+				const blob = new Blob(
+					[byteArray],
+					{ type: binary.type }
+				);
+
+				const link = document.createElement("a");
+				link.href = URL.createObjectURL(blob);
+				link.download = binary.fileName;
+				document.body.appendChild(link);
+
+				link.click();
+				document.body.removeChild(link);
+			}
+		});
+
+			// Include signature in POST URL for waiting forms
+			let postUrl = '';
+			if (window.location.href.includes('form-waiting') && formSignature) {
+				postUrl = '?signature=' + encodeURIComponent(formSignature);
+			}
+
+			// Double-stash (Handlebars-escaped) so a future change to the token
+			// format can't introduce HTML/JS injection here. The current token
+			// is `<base64url>|<digits>|<hex>` — none of those characters
+			// trigger HTML escaping, so this is a no-op today.
+			const authToken = '';
+			const headers = {};
+			if (authToken) {
+				headers['x-auth-token'] = authToken;
+			}
+
+			fetch(postUrl, {
+					method: 'POST',
+					body: {},
+					headers,
+			})
+			.then(async function (response) {
+					if (response.status === 200) {
+						const redirectUrl = document.getElementById("redirectUrl");
+						if (redirectUrl) {
+							redirectTo(redirectUrl.href);
+						}
+					}
+
+					const text = await response.text();
+					let json;
+
+					try {
+							json = JSON.parse(text);
+					} catch (e) {}
+
+					if (json?.redirectURL) {
+							redirectTo(json.redirectURL);
+					}
+			})
+			.catch(function (error) {
+					console.error('Error:', error);
+			})
+			.finally(() => {
+				timeoutId = setTimeout(checkExecutionStatus, interval);
+			});
+	</script>
+	</body>
+
+</html>

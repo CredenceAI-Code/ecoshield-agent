@@ -94,6 +94,10 @@ const readIn = String($json['Meter reading (day, hour, L/h)'] || '').split(',').
 const st = { run_id: 'ES-' + Date.now().toString(36).toUpperCase(), trace: [], steps: 0, done: [], plan_log: [], egress_log: [], invalid: 0, llm_failures: 0, planner_mode: 'llm', note: '' };
 const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
 ev('human', 'input', { selection: sel, note_attached: !!noteIn.trim() });
+const limIn = parseFloat($json['Approval wait limit (minutes)']);
+st.approval_limit_min = isNaN(limIn) ? 15 : Math.min(60, Math.max(1, limIn));
+st.drill = /outage/i.test(String($json['Failure drill'] || '')) ? 'groq_outage' : null;
+if (st.drill) ev('human', 'failure_drill', { drill: st.drill, effect: 'the cloud AI calls are made to fail on purpose, to show the fallback chain (second cloud model, then the local model, then plain code)' });
 const reject = (scenario, request, guard, extra) => [{ json: Object.assign(st, { gate: 'REJECT', scenario, request, guard, leak: null, bill: null, data: null, ai: null }, extra || {}) }];
 if (/^RESET/i.test(sel)) {
   sd.mem = newMemory(); ev('tool', 'reset_demo_memory', { devices: 0, history: 0, undo: 0 });
@@ -112,6 +116,14 @@ const note = noteIn.trim() || scn.note || '';
 const nv = validateNote(note);
 ev('guard', 'input_validation', { note_checked: !!note, ok: nv.ok, reason: nv.reason || null, note: note.slice(0, 400) });
 Object.assign(st, { scenario: { id: scn.id, name: scn.name, desc: scn.desc }, request, note });
+// Round 3 real trigger: an uploaded meter CSV replaces the canned scenario data (UNDO ignores any file)
+const bin = $input.first().binary || {}, bkey = Object.keys(bin)[0];
+if (bkey && !/^UNDO/i.test(sel)) {
+  const buf = await this.helpers.getBinaryDataBuffer(0, bkey), pc = parseMeterCsv(buf.toString('utf8'), bin[bkey].fileName);
+  ev('input', 'meter_file', pc.ok ? { source: 'uploaded_file', filename: pc.filename, bytes: pc.bytes, rows: pc.row_count, non_numeric_cells: pc.non_numeric_cells, fingerprint: pc.fingerprint } : { source: 'uploaded_file', rejected: true, filename: pc.filename, reason: pc.reason });
+  if (!pc.ok) return reject(st.scenario, request, { status: 'BLOCKED', rule: 'upload_rejected', reason: 'The meter file was rejected: ' + pc.reason + '. Nothing was analysed and nothing was changed.', suggested_setpoint_c: null });
+  st.upload = { rows: pc.rows, now: pc.now, filename: pc.filename, fingerprint: pc.fingerprint };
+} else ev('input', 'meter_file', { source: 'canned_scenario' });
 st.roomReq = (offIn || !isNaN(tgtIn)) ? { offline: offIn ? [offIn] : [], target: isNaN(tgtIn) ? 27 : tgtIn } : null;
 st.edits = readIn.length === 3 && readIn.every(x => !isNaN(x)) ? [{ day: readIn[0], hour: readIn[1], v: readIn[2] }] : [];
 if (st.edits.length) ev('input', 'typed_meter_reading', st.edits[0]);
@@ -145,6 +157,7 @@ if (need) {
     'Reply with JSON only: {"next":"<one runnable tool>","why":"<=10 words"}.';
   const messages = [{ role: 'system', content: system }, { role: 'user', content: user }];
   st.planBodies = { groq: { model: 'openai/gpt-oss-120b', temperature: 0, max_tokens: 120, reasoning_effort: 'low', messages }, groq20: { model: 'openai/gpt-oss-20b', temperature: 0, max_tokens: 120, reasoning_effort: 'low', messages }, ollama: { model: 'qwen3:1.7b', stream: false, think: false, options: { temperature: 0, num_predict: 60 }, messages } };
+  if (st.drill === 'groq_outage') { st.planBodies.groq.model = 'drill-groq-outage'; st.planBodies.groq20.model = 'drill-groq-outage'; }   // failure drill: the cloud calls are made to fail on purpose
 }
 return [{ json: st }];
 """
@@ -154,7 +167,8 @@ const p = $('Plan state').first().json, j = $json || {};
 const st = Object.assign({}, p); ['planBodies', 'runnableNow', 'det', 'need_llm', 'by_no_llm'].forEach(k => delete st[k]);
 st.trace = p.trace.slice();
 const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
-let choice = p.det, by = '', why = '', provider = null;
+let choice = p.det, by = '', why = '', provider = null, tok = null, tokIn = null, tokOut = null;
+if (j.usage && j.usage.total_tokens) { tok = j.usage.total_tokens; tokIn = j.usage.prompt_tokens || null; tokOut = j.usage.completion_tokens || null; } else if (j.prompt_eval_count || j.eval_count) { tokIn = j.prompt_eval_count || 0; tokOut = j.eval_count || 0; tok = tokIn + tokOut; }
 if (!p.need_llm) by = p.by_no_llm;
 else {
   let raw = '';
@@ -170,7 +184,8 @@ else {
 }
 st.steps = p.steps + 1; st.choice = choice;
 st.plan_log = (p.plan_log || []).concat([{ step: st.steps, runnable: p.runnableNow, choice, by, why }]);
-ev(p.need_llm ? 'llm' : 'code', 'plan_step', { step: st.steps, runnable: p.runnableNow, choice, by, why });
+st.tokens_plan = (p.tokens_plan || 0) + (tok || 0);
+ev(p.need_llm ? 'llm' : 'code', 'plan_step', { step: st.steps, runnable: p.runnableNow, choice, by, why, tokens: tok, tokens_in: tokIn, tokens_out: tokOut });
 return [{ json: st }];
 """
 
@@ -182,13 +197,13 @@ const sd = $getWorkflowStaticData('global'); sd.mem = sd.mem || newMemory();
 const sid = st.scenario.id;
 if (TOOLS.indexOf(st.choice) < 0 || st.choice === 'finish') throw new Error('Tool not on the allow-list: ' + st.choice);
 if (st.choice === 'read_meter_data') {
-  const rec = get_local_meter_and_occupancy(sid); (st.edits || []).forEach(e => { const r = rec.rows.find(x => x.day === e.day && x.hour === e.hour); if (r) r.water_lph = e.v; }); const v = validateMeterRows(rec.rows, rec.now);
+  const rec = recordFor(st, sid); (st.edits || []).forEach(e => { const r = rec.rows.find(x => x.day === e.day && x.hour === e.hour); if (r) r.water_lph = e.v; }); const v = validateMeterRows(rec.rows, rec.now);
   st.data = { ok: v.ok, issues: v.issues, rows: v.rows, bad_values: v.bad_values || 0, set_aside: v.set_aside || 0, set_aside_notes: v.set_aside_notes || [], newest_age_hours: v.newest_age_hours };
   st.state = v.ok ? { occupied: rec.now.occupied, outdoor_c: rec.now.outdoor_c } : null;
-  ev('tool', 'read_meter_data', { stays_on_device: true, validation: st.data });
+  ev('tool', 'read_meter_data', { stays_on_device: true, source: rec.source, validation: st.data });
 } else if (st.choice === 'run_leak_and_bill_forecaster') {
-  const rec2 = get_local_meter_and_occupancy(sid); (st.edits || []).forEach(e => { const r = rec2.rows.find(x => x.day === e.day && x.hour === e.hour); if (r) r.water_lph = e.v; });
-  const out = run_leak_and_bill_forecaster(sid, rec2.rows); st.leak = out.leak; st.bill = out.bill; st.set_aside = out.set_aside; st.evidence = out.evidence;
+  const rec2 = recordFor(st, sid); (st.edits || []).forEach(e => { const r = rec2.rows.find(x => x.day === e.day && x.hour === e.hour); if (r) r.water_lph = e.v; });
+  const out = run_leak_and_bill_forecaster(sid, rec2.rows, rec2.now); st.leak = out.leak; st.bill = out.bill; st.set_aside = out.set_aside; st.evidence = out.evidence;
   ev('tool', 'run_leak_and_bill_forecaster', { leak: out.leak.verdict, evidence_score: out.evidence.score, evidence_level: out.evidence.level, evidence_reasons: out.evidence.reasons, set_aside_readings: out.set_aside, est_lph: out.leak.est_lph, month_bill_aed: out.bill.with_leak.total_aed, tariff_verified: TARIFF.verified });
 } else if (st.choice === 'lookup_case_history') {
   st.history_info = lookupHistory(sd.mem, sid, st.request.type); ev('memory', 'lookup_case_history', st.history_info);
@@ -217,6 +232,7 @@ if (st.need_replan) {
     'Reply with JSON only: {"action":"SETPOINT","setpoint_c":<number>,"why":"<=10 words"} or {"action":"NONE","why":"<=10 words"}.';
   const messages = [{ role: 'system', content: system }, { role: 'user', content: user }];
   st.replanBodies = { groq: { model: 'openai/gpt-oss-120b', temperature: 0, max_tokens: 120, reasoning_effort: 'low', messages }, groq20: { model: 'openai/gpt-oss-20b', temperature: 0, max_tokens: 120, reasoning_effort: 'low', messages }, ollama: { model: 'qwen3:1.7b', stream: false, think: false, options: { temperature: 0, num_predict: 60 }, messages } };
+  if (st.drill === 'groq_outage') { st.replanBodies.groq.model = 'drill-groq-outage'; st.replanBodies.groq20.model = 'drill-groq-outage'; }
 }
 return [{ json: st }];
 """
@@ -236,6 +252,7 @@ const d = $('Parse LLM').first().json, f = $json;
 const st = Object.assign({}, d); st.trace = d.trace.slice();
 const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
 st.review = recordReview(f['Decision'], f['Reviewer'], f['Note (optional)']); st.write = null;
+if (f['Decision'] === undefined || f['Decision'] === null) { st.review.timed_out = true; st.review.note = 'timed out: nobody answered within ' + st.approval_limit_min + ' min'; ev('system', 'approval_timeout', { limit_min: st.approval_limit_min, kind: 'review', safe_default: 'nothing changes; the case stays open for a named person' }); }
 ev('human', 'replan_review', { decision: st.review.decision, reviewer: st.review.reviewer, note: st.review.note || null, comment: st.review.comment });
 ev('tool', 'write_gateway', { skipped: true, reason: 'the guard blocked the request; a review cannot override a hard limit' });
 return [{ json: st }];
@@ -293,6 +310,7 @@ st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor: 'privacy
 const messages = [{ role: 'system', content: system }, { role: 'user', content: user }];
 st.llm = { groqBody: { model: 'openai/gpt-oss-120b', temperature: 0, max_tokens: 700, reasoning_effort: 'low', messages }, groq20Body: { model: 'openai/gpt-oss-20b', temperature: 0, max_tokens: 700, reasoning_effort: 'low', messages },
   ollamaBody: { model: 'qwen3:1.7b', stream: false, think: false, options: { temperature: 0, num_predict: 350 }, messages } };
+if (st.drill === 'groq_outage') { st.llm.groqBody.model = 'drill-groq-outage'; st.llm.groq20Body.model = 'drill-groq-outage'; }
 return [{ json: st }];
 """
 
@@ -301,9 +319,9 @@ const d = $('Build LLM prompt').first().json;
 const j = $json || {};
 const st = Object.assign({}, d); st.trace = d.trace.slice();
 const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
-let provider = 'template', raw = '', tokens = null;
-if (j.choices && j.choices[0] && j.choices[0].message) { provider = /gpt-oss-20b/i.test(String(j.model || '')) ? 'groq-20b' : 'groq'; raw = String(j.choices[0].message.content || ''); tokens = j.usage ? j.usage.total_tokens : null; }
-else if (j.message && j.message.content) { provider = 'ollama'; raw = String(j.message.content); tokens = (j.prompt_eval_count || 0) + (j.eval_count || 0); }
+let provider = 'template', raw = '', tokens = null, tIn = null, tOut = null;
+if (j.choices && j.choices[0] && j.choices[0].message) { provider = /gpt-oss-20b/i.test(String(j.model || '')) ? 'groq-20b' : 'groq'; raw = String(j.choices[0].message.content || ''); tokens = j.usage ? j.usage.total_tokens : null; tIn = j.usage ? j.usage.prompt_tokens : null; tOut = j.usage ? j.usage.completion_tokens : null; }
+else if (j.message && j.message.content) { provider = 'ollama'; raw = String(j.message.content); tIn = j.prompt_eval_count || 0; tOut = j.eval_count || 0; tokens = tIn + tOut; }
 const allowed = new Set(['24', '27', '10', '38']);
 const walk = (v) => { if (typeof v === 'number') { allowed.add(String(v)); allowed.add(String(Math.round(v))); allowed.add(String(Math.round(v * 10) / 10)); } else if (v && typeof v === 'object') Object.values(v).forEach(walk); };
 walk(d.outbound);
@@ -332,7 +350,7 @@ const tmpl = {
   headline: L.verdict === 'LEAK' ? 'Probable leak: about ' + o.est_leak_lph + ' L/h flowing when the building is quiet' : (L.verdict === 'WATCH' ? 'Small constant night flow worth watching' : (L.verdict === 'INSUFFICIENT_DATA' ? 'Not enough meter data to judge leaks' : (L.verdict === 'NOT_RUN' ? 'No analysis possible: meter data rejected' : 'No leak found'))),
   explanation: (o.bill_total_aed !== null ? 'Forecast bill this month: AED ' + o.bill_total_aed + (o.tariff_verified ? ' (DEWA published tariff, simplified). ' : ' (assumed tariff, not verified). ') : '') + (L.verdict === 'LEAK' ? 'The leak adds about AED ' + o.leak_bill_impact_aed + ' to this month. ' : '') + 'Safety check: ' + o.guard_reason,
   tip: o.guard_status === 'BLOCKED' ? 'No action is possible on this request; it was stopped by a hard rule.' : (L.verdict === 'LEAK' ? 'Have a person inspect the pipes and approve closing the main valve if needed.' : 'Review the request and approve or reject it.') };
-ev('llm', 'explain', { provider_answered: provider, groq_failed_over_to_ollama: provider === 'ollama', tokens, used: llm ? 'ai_text' : 'plain_code_template', note: why || 'ok', words_only_no_decisions: true });
+ev('llm', 'explain', { provider_answered: provider, groq_failed_over_to_ollama: provider === 'ollama', tokens, tokens_in: tIn, tokens_out: tOut, used: llm ? 'ai_text' : 'plain_code_template', note: why || 'ok', words_only_no_decisions: true });
 st.ai = { provider, text: llm || tmpl, from_ai: !!llm, note: why, tokens };
 const h = d.history_info;
 st.history_note = h && h.last_decision ? ' Earlier decision on this request: ' + (h.last_decision.approved ? 'approved' : 'rejected') + ' by ' + h.last_decision.reviewer + '.' : '';
@@ -344,8 +362,13 @@ JS_APPROVE_WRITE = CORE + r"""
 const d = $('Parse LLM').first().json, f = $json;
 const st = Object.assign({}, d); st.trace = d.trace.slice();
 const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
+const timedOut = f['Decision'] === undefined || f['Decision'] === null;   // the wait limit ran out: n8n resumed the run with no form answer
 const rev = applyReview(f['Decision'], f['Reviewer'], f['Note (optional)']);
-ev('human', 'approval', { decision: String(f['Decision']), reviewer: rev.reviewer, approved: rev.approved, note: rev.note, comment: rev.comment });
+if (timedOut) {
+  rev.timed_out = true; rev.note = 'timed out: nobody answered within ' + st.approval_limit_min + ' min';
+  ev('system', 'approval_timeout', { limit_min: st.approval_limit_min, request: st.request, safe_default: 'nothing is written; the action stays held for a named person' });
+}
+ev('human', 'approval', { decision: timedOut ? 'TIMEOUT (no answer)' : String(f['Decision']), reviewer: rev.reviewer, approved: rev.approved, note: rev.note, comment: rev.comment });
 st.review = rev; st.write = null;
 if (rev.approved && st.auto && st.auto.status === 'HELD') {
   // medium evidence: the held leak alert is raised only now, through the same gateway, on the named person's approval
@@ -420,7 +443,7 @@ return [{ json: { html } }];
 # ------------------------------------------------------------------- the graph
 add("Console form", "n8n-nodes-base.formTrigger", {
     "formTitle": "EcoShield console",
-    "formDescription": "Pick one of the demo scenarios. All building data is synthetic and stays on this laptop. UNDO and RESET are on the list too. Dashboard: http://localhost:5678/webhook/ecoshield-dashboard",
+    "formDescription": "Pick the request (the demo scenarios double as request presets). Optionally upload a meter CSV (day,hour,water_lph,kwh,occupied,outdoor_c) to run on your own data instead of the built-in scenario data. All building data is synthetic and stays on this laptop. UNDO and RESET are on the list too. Dashboard: http://localhost:5678/webhook/ecoshield-dashboard",
     "formFields": {"values": [
         {"fieldLabel": "Scenario", "fieldType": "dropdown", "requiredField": True,
          "fieldOptions": {"values": [{"option": l} for l in SCENARIO_LABELS]}},
@@ -431,7 +454,12 @@ add("Console form", "n8n-nodes-base.formTrigger", {
         {"fieldLabel": "Raise all unoccupied rooms to (C)", "fieldType": "text", "requiredField": False,
          "placeholder": "Optional, e.g. 27. Rooms with a dead sensor are never raised."},
         {"fieldLabel": "Operator note", "fieldType": "textarea", "requiredField": False,
-         "placeholder": "Optional note from an operator or automation. It is treated as data and checked for injection."}]},
+         "placeholder": "Optional note from an operator or automation. It is treated as data and checked for injection."},
+        {"fieldLabel": "Meter CSV file", "fieldType": "file", "requiredField": False, "multipleFiles": False, "acceptFileTypes": ".csv"},
+        {"fieldLabel": "Approval wait limit (minutes)", "fieldType": "number", "requiredField": False,
+         "placeholder": "Optional, 1 to 60, default 15. If nobody answers in time, nothing is changed."},
+        {"fieldLabel": "Failure drill", "fieldType": "dropdown", "requiredField": False,
+         "fieldOptions": {"values": [{"option": "None (normal run)"}, {"option": "Groq outage: make the cloud AI calls fail on purpose"}]}}]},
     "options": {}}, 0, 300, version=2.2, webhookId=CONSOLE_FORM_ID)
 code("Validate input", JS_VALIDATE, 240, 300)
 if_true("Input accepted?", "={{ $json.gate === 'RUN' }}", 480, 300)
@@ -457,7 +485,9 @@ ollama_http("Ollama explain", "$('Build LLM prompt').first().json.llm.ollamaBody
 code("Parse LLM", JS_PARSE_LLM, 3120, 200)
 if_true("Cloud call allowed?", "={{ !$json.egress_blocked }}", 2880, 120)
 if_true("Needs approval?", "={{ $json.guard.status === 'NEEDS_APPROVAL' }}", 3360, 200)
+WAIT_LIMIT = {"limitWaitTime": True, "limitType": "afterTimeInterval", "resumeAmount": "={{ $json.approval_limit_min }}", "resumeUnit": "minutes"}
 add("Approval form", "n8n-nodes-base.form", {
+    **WAIT_LIMIT,
     "formFields": {"values": [
         {"fieldLabel": "Decision", "fieldType": "dropdown", "requiredField": True,
          "fieldOptions": {"values": [{"option": "Approve"}, {"option": "Reject"}]}},
@@ -468,6 +498,7 @@ add("Approval form", "n8n-nodes-base.form", {
     3600, 100, version=2.3, webhookId=uid("webhook:approval"))
 if_true("Needs review?", "={{ $json.rp_done === 'review' }}", 3600, 420)
 add("Review form", "n8n-nodes-base.form", {
+    **WAIT_LIMIT,
     "formFields": {"values": [
         {"fieldLabel": "Decision", "fieldType": "dropdown", "requiredField": True,
          "fieldOptions": {"values": [{"option": "Acknowledge: keep current settings"}, {"option": "Escalate to the facilities manager"}]}},

@@ -87,13 +87,14 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
   function log(kind, text) { audit.unshift({ t: new Date().toLocaleTimeString('en-GB'), kind: kind, text: text }); renderAudit(); }
 
   var edits = {};   // meter readings typed in by the user, per scenario
+  var uploaded = null, uploadErr = '';   // Round 3: a meter CSV the visitor loads replaces the built-in scenario data
   function pipeline(rec, note) {
     var req = rec.request, scn = rec.scenario;
     var nc = validateNote(note);
     if (!nc.ok) return { stage: 'note', nc: nc, guard: { status: 'BLOCKED', rule: 'injection_blocked', reason: nc.reason } };
     var feed = validateMeterRows(rec.rows, rec.now);
     if (!feed.ok) return { stage: 'feed', nc: nc, feed: feed, guard: heatGuard(req, {}) };
-    var out = run_leak_and_bill_forecaster(scn.id, rec.rows);
+    var out = run_leak_and_bill_forecaster(scn.id, rec.rows, rec.now);
     var state = { occupied: rec.now.occupied, outdoor_c: rec.now.outdoor_c };
     var guard = heatGuard(req, Object.assign({}, state, { device: device }));
     return { stage: 'ok', nc: nc, feed: feed, leak: out.leak, bill: out.bill, evidence: out.evidence, autonomy: autonomyFor(out.evidence), guard: guard, state: state };
@@ -289,6 +290,15 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
     return h + '</div>';
   }
 
+  function uploadCard() {
+    return '<div class="card"><h3>Run on your own meter file <span class="dim" style="font-weight:400">(optional, the same trigger as the n8n form)</span></h3>' +
+      '<div class="mut">Upload a CSV with the columns <b>day, hour, water_lph, kwh, occupied, outdoor_c</b>. Only those numeric columns are read; the file is parsed in this browser and goes nowhere. The scenario you pick sets the request.</div>' +
+      '<div class="row"><div><input type="file" id="csvIn" accept=".csv,text/csv"></div><div>' +
+      (uploaded ? '<span class="chip">using ' + esc(uploaded.filename) + ': ' + uploaded.row_count + ' rows, fingerprint ' + esc(uploaded.fingerprint) + '</span> <button id="csvClear">Use the built-in data</button>' : '<span class="chip">using the built-in scenario data</span>') +
+      (uploadErr ? ' <span class="chip" style="border-color:#ff6b5b;color:#ff6b5b">file rejected: ' + esc(uploadErr) + '. Nothing was analysed.</span>' : '') +
+      '</div></div></div>';
+  }
+
   function renderAudit() {
     var el = $('#audit'); if (!el) return;
     el.innerHTML = audit.length ? audit.map(function (a) { return '<div>' + a.t + ' · ' + esc(a.kind) + ' · ' + esc(a.text) + '</div>'; }).join('') : '<div>No events yet. Approve something above.</div>';
@@ -297,11 +307,13 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
   function render() {
     renderList();
     var rec = get_local_meter_and_occupancy(curId), scn = rec.scenario;
+    if (uploaded) { rec.rows = JSON.parse(JSON.stringify(uploaded.rows)); rec.now = uploaded.now; }
     (edits[curId] || []).forEach(function (e) { var r = rec.rows.filter(function (x) { return x.day === e.day && x.hour === e.hour; })[0]; if (r) r.water_lph = e.v; });
     device = devices[curId] || (devices[curId] = defaultDevice()); history = hist[curId] || (hist[curId] = []);
     var note = curNote !== '' ? curNote : (scn.note || '');
     var p = pipeline(rec, note);
     var h = '<div class="card"><h3>' + esc(scn.id + '. ' + scn.name) + '</h3><div class="mut">' + esc(scn.desc) + '</div><div class="chips"><span class="chip">day ' + rec.now.day + ', ' + String(rec.now.hour).padStart(2, '0') + ':00</span><span class="chip">' + (rec.now.occupied ? 'people inside' : 'building empty') + '</span><span class="chip">' + rec.now.outdoor_c + ' °C outside</span><span class="chip">synthetic data</span></div></div>';
+    h = uploadCard() + h;
     h += sectionInput(p, note) + sectionLeak(p) + sectionBill(p) + sectionEvidence(p) + sectionGuard(p, rec) + sectionRooms() + sectionPrivacy(p, rec) + sectionApproval(p, rec);
     h += '<div class="card"><h3><span>7</span>Audit trail <span class="dim" style="font-weight:400">(this browser session; the n8n agent writes every step to a file)</span></h3><div class="log" id="audit"></div></div>';
     $('#main').innerHTML = h;
@@ -310,6 +322,18 @@ footer{max-width:1240px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
   }
 
   function wire(rec, p, note) {
+    var cf = $('#csvIn');
+    if (cf) cf.addEventListener('change', function () {
+      var f = cf.files[0]; if (!f) return; var fr = new FileReader();
+      fr.onload = function () {
+        var pc = parseMeterCsv(String(fr.result), f.name);
+        if (pc.ok) { uploaded = pc; uploadErr = ''; log('input', 'Meter file ' + f.name + ': ' + pc.row_count + ' rows, fingerprint ' + pc.fingerprint + '. Used instead of the built-in data.'); }
+        else { uploaded = null; uploadErr = pc.reason; log('input', 'Meter file rejected before any analysis: ' + pc.reason); }
+        lastResult = ''; render();
+      };
+      fr.readAsText(f);
+    });
+    var cc = $('#csvClear'); if (cc) cc.addEventListener('click', function () { uploaded = null; uploadErr = ''; lastResult = ''; render(); });
     var n = $('#note');
     n.addEventListener('change', function () { curNote = n.value === '' ? ' ' : n.value; lastResult = ''; render(); if (n.value !== '') log('input', 'Note checked: ' + (validateNote(n.value).ok ? 'clean' : 'rejected before any tool or AI.')); });
     var upd = function () {

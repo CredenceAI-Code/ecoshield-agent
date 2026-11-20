@@ -70,6 +70,7 @@ Every node receives one item and hands on one item. In EcoShield that item is a 
 ### 1. Console form (Form Trigger)
 - **In:** Nothing. This is the start of every run.
 - **Does:** Shows a web form titled "EcoShield console". Five fields: **Scenario** (a required dropdown with 16 choices: scenarios 1 to 14, "UNDO - roll back the last applied change" and "RESET - clear the demo memory") and **Operator note** (optional text box; the placeholder says it is treated as data and checked for injection). Three more optional fields: **Meter reading (day, hour, L/h)** (one typed value that replaces a reading; impossible values are set aside, HS-5.3), **Offline room sensor (name)** and **Raise all unoccupied rooms to (C)** (HS-5.5).
+- **Round 3 fields:** **Meter CSV file** (optional upload, checked in code in node 2), **Approval wait limit (minutes)** (default 15) and **Failure drill** (None / Groq outage). The earlier text above lists the original fields.
 - **Out:** 1 item with the answers.
 - **Why:** A person can start a run from a browser with no code. The dropdown means the input is one of a fixed list, not free text.
 - **Notes:** The form address is fixed (id be2bf8f1-b886-4585-950c-82bcc0648882), so re-importing never changes the link: http://localhost:5678/form/be2bf8f1-.... The workflow must be published for runs to count in memory.

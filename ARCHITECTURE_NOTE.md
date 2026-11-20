@@ -91,6 +91,7 @@ The AI can make the system more cautious or leave it unchanged; it cannot loosen
 - **Memory** is n8n static data, not a database. Two approvals paused at the same time could overwrite each other's memory (untested): do one at a time.
 - The **reviewer name is typed, not authenticated.**
 - The **audit log stays local and does contain occupancy**; only the sanitised payload goes to the cloud.
-- **Not built:** approval timeout with a safe default, a conflict check between simultaneous requests, Cerebras/Gemini fallback links, tracing, multi-agent, the optional stretch features (irrigation, leaderboard, pre-cooling scheduler).
+- **Round 3:** the approval timeout with a safe default IS now built (wait limit on both approval forms), as are CSV upload, the failure drill and token logging.
+- **Not built:** a conflict check (the burst test showed simultaneous runs lose memory updates) between simultaneous requests (see above), Cerebras/Gemini fallback links, tracing, multi-agent, the optional stretch features (irrigation, leaderboard, pre-cooling scheduler).
 - The local model (1.7b) is weak; the manual suggests a 4b model, which did not fit in free RAM with Chrome open.
 - The pre-build history is stated in `CHECKPOINTS.md`: the first plan was for a Python build; the n8n plan was written after the build.

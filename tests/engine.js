@@ -17,7 +17,7 @@ function makeEngine(workflow, opts) {
     const audit = [], httpLog = [];                       // per run: audit lines written, and every body that would have left the laptop
     const last = {}, outputs = {}, steps = [];
     const $ = (raw) => { const name = strip(raw); return { first: () => (last[name] || [{ json: {} }])[0], all: () => last[name] || [], last: () => (last[name] || [{ json: {} }]).slice(-1)[0] }; };
-    const queue = [{ node: triggerName, item: { json } }];
+    const queue = [{ node: triggerName, item: o.binary ? { json, binary: o.binary } : { json } }];
     let response = null, guard = 0;
     while (queue.length) {
       if (++guard > 400) throw new Error('loop guard: too many node executions');
@@ -28,9 +28,12 @@ function makeEngine(workflow, opts) {
       if (n.type === 'n8n-nodes-base.formTrigger' || n.type === 'n8n-nodes-base.webhook') {
         outs = [[item]];
       } else if (n.type === 'n8n-nodes-base.code') {
-        const fn = new AsyncFunction('$json', '$', '$getWorkflowStaticData', 'Buffer', n.parameters.jsCode);
-        const self = { helpers: { prepareBinaryData: async (buf, fileName, mime) => ({ data: buf.toString('base64'), fileName, mimeType: mime }) } };
-        const res = await fn.call(self, item.json, $, () => sd, Buffer);
+        const fn = new AsyncFunction('$json', '$', '$getWorkflowStaticData', 'Buffer', '$input', n.parameters.jsCode);
+        const self = { helpers: {
+          prepareBinaryData: async (buf, fileName, mime) => ({ data: buf.toString('base64'), fileName, mimeType: mime }),
+          getBinaryDataBuffer: async (i, key) => Buffer.from(item.binary[key].data, 'base64')
+        } };
+        const res = await fn.call(self, item.json, $, () => sd, Buffer, { first: () => item, all: () => [item] });
         outs = [res];
       } else if (n.type === 'n8n-nodes-base.if') {
         const v = !!evalExpr(n.parameters.conditions.conditions[0].leftValue, ctx);
