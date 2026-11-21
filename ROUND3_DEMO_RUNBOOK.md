@@ -27,7 +27,7 @@ For the live demo at the finale. Everything runs **on this laptop**; judges cann
 | 2 | On the approval form pick **Approve**, type your full name, Submit | "Approved by <name> and applied: close the main water valve" | "A named person signs. The AI cannot." |
 | 3 | Form again: scenario 2, upload `7_bad_file_missing_columns.csv` | Rejected before any AI, reason shown | "Bad input never reaches the AI." |
 | 4 | Form: scenario **11** (injection note), no file | Rejected before any AI saw it | "Prompt injection stopped by code." |
-| 5 | Form: scenario 1, upload leak file, **Failure drill = Groq outage** | Same safe result, written by the local model or the template; slower | "We break the cloud AI on purpose. The rules still hold." |
+| 5 | Form: scenario 1, upload leak file, **Failure drill = Groq outage** | Slower; explanation from the local model or template; the AI second opinion is missing, so the leak alert is held for a named person (fail closed) | "We break the cloud AI on purpose. The rules still hold." |
 | 6 | Dashboard | Table of runs, each replayable from the log | "Everything is in the audit log." |
 
 For the **approval timeout** (only if asked, it needs about 70 seconds): form with scenario 1, set **Approval wait limit = 1**, submit, do NOT answer the approval form. After about a minute the audit log gets an `approval_timeout` line and nothing is changed.

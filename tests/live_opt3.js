@@ -32,13 +32,17 @@ const auditFor = (pred) => fs.readFileSync(AUDIT, 'utf8').split('\n').filter(Boo
 (async () => {
   await sleep(15000);
   let j = await submit({ 'field-0': RESET }); await finish(j.formWaitingUrl, true);
-  for (const sc of [1, 4]) {
-    const t0 = Date.now(); j = await submit({ 'field-0': label(sc) }, sc === 1 ? toCsv(C.get_local_meter_and_occupancy(1).rows) : undefined, 'leak_week.csv');
+  const runs = [[1, null, 'normal run'], [1, 'Groq outage: make the cloud AI calls fail on purpose', 'Groq outage drill']];
+  for (const [sc, drill, tag] of runs) {
+    const t0 = Date.now(); const f = { 'field-0': label(sc) }; if (drill) f['field-7'] = drill;
+    j = await submit(f, toCsv(C.get_local_meter_and_occupancy(1).rows), 'leak_week.csv');
     const r = await finish(j.formWaitingUrl, true);
-    const ev = auditFor(e => Date.parse(e.ts) >= t0 && (e.step === 'evidence_review' || e.step === 'autonomy_level'));
-    console.log('scenario', sc, 'secs', Math.round((Date.now() - t0) / 1000), 'page has AI second opinion:', /AI second opinion/.test(r.page));
-    ev.forEach(e => console.log('  ', e.step, JSON.stringify(e.detail).slice(0, 400)));
-    okk(ev.some(e => e.step === 'evidence_review' && e.detail.level) && ev.some(e => e.step === 'autonomy_level' && e.detail.ai_level), 'scenario ' + sc + ': AI level and combined level both logged');
+    await sleep(3000);
+    const ev = auditFor(e => Date.parse(e.ts) >= t0 && (e.step === 'evidence_review' || e.step === 'autonomy_level' || e.step === 'auto_action'));
+    console.log(tag, 'secs', Math.round((Date.now() - t0) / 1000), 'approval asked:', r.asked);
+    ev.forEach(e => console.log('  ', e.step, JSON.stringify(e.detail).slice(0, 330)));
+    if (!drill) okk(ev.some(e => e.step === 'autonomy_level' && e.detail.combined_by === 'code and AI agree'), tag + ': AI answered and agreed, acted alone');
+    else okk(ev.some(e => e.step === 'evidence_review' && e.detail.ok === false) && ev.some(e => e.step === 'autonomy_level' && e.detail.level === 'MEDIUM' && /does not act alone/.test(e.detail.combined_by)), tag + ': AI unavailable -> fail closed, held for a person');
     j = await submit({ 'field-0': RESET }); await finish(j.formWaitingUrl, true);
   }
   console.log(pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

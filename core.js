@@ -219,7 +219,7 @@ function evidenceFacts(rows, leak, setAsideCount, nowHour) {
 const LEVEL_RANK = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 function combineLevels(codeLevel, aiLevel) {
   if (!LEVEL_RANK.hasOwnProperty(codeLevel)) return { level: codeLevel, source: 'no code level' };
-  if (!aiLevel || !LEVEL_RANK.hasOwnProperty(aiLevel)) return { level: codeLevel, source: 'code only (no usable AI answer)' };
+  if (!aiLevel || !LEVEL_RANK.hasOwnProperty(aiLevel)) return codeLevel === 'HIGH' ? { level: 'MEDIUM', source: 'no AI opinion could be obtained, so the agent does not act alone' } : { level: codeLevel, source: 'code only (no usable AI answer)' };
   if (codeLevel === 'HIGH' && aiLevel === 'HIGH') return { level: 'HIGH', source: 'code and AI agree' };
   if (codeLevel === 'LOW' && aiLevel === 'LOW') return { level: 'LOW', source: 'code and AI agree' };
   if (codeLevel === aiLevel) return { level: 'MEDIUM', source: 'code and AI agree' };

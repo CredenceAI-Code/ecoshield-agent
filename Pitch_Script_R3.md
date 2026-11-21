@@ -20,7 +20,7 @@ Before you start: n8n running, 3 tabs open (console form, dashboard, hosted demo
 
 ## 1:00 – 3:30  Live demo  (slide 3, then the browser)
 
-**Slide 3** (10 seconds): "This is the workflow: trigger, validate, agent acts, approve, output. 42 nodes in n8n."
+**Slide 3** (10 seconds): "This is the workflow: trigger, validate, agent acts, approve, output. 43 nodes in n8n."
 
 **Switch to the console form.**
 
@@ -28,7 +28,7 @@ Before you start: n8n running, 3 tabs open (console form, dashboard, hosted demo
 2. (0:20) **On the approval form: Approve, type your full name, Submit.** "Closing the main valve is risky, so a named person signs. The AI cannot." Page shows approved by your name.
 3. (0:20) **Form: scenario 2, upload `7_bad_file_missing_columns.csv`.** "Bad input is rejected before any AI sees it."
 4. (0:20) **Form: scenario 11 (injection note).** "A note that tries to override our safety limits. Stopped by code, before the AI."
-5. (0:30) **Form: scenario 1, leak file, Failure drill = Groq outage.** "Now we break the cloud AI on purpose." Result appears slower, same safe answer. "The local model answered. The rules did not change."
+5. (0:30) **Form: scenario 1, leak file, Failure drill = Groq outage.** "Now we break the cloud AI on purpose." Result appears slower. "The cloud AI is down, so the AI second opinion is missing. The agent does not act alone: the alert is held for a named person." Approve with your name if you want to show the next step.
 6. (0:10) **Dashboard.** "Every run is here, and replayable from the log."
 
 **Saying it while the page loads:** "Five inputs, one after another, all completed. Five at once, all completed in 40 seconds. We have the table on slide 4."
@@ -75,7 +75,7 @@ Keep answers to two sentences. If you do not know, say "we did not test that."
 1. **Is it connected to a real building?** No. Meter data is synthetic, the tariff is a simplified DEWA tariff, the valve and thermostat are simulated. The pilot starts on exported files with no controls attached.
 2. **What stops the AI from doing something unsafe?** It never writes anything. It only orders four allow-listed tools and writes the explanation. Code validates input, does the maths, enforces limits, and a named person approves risky changes.
 3. **What if nobody approves?** After the wait limit (default 15 minutes, 1 to 60) nothing is written, the log says "timed out", and the action stays held for a named person. We showed it live with a 1-minute limit.
-4. **What if Groq is down?** Chain: Groq 120B, Groq 20B, local Ollama model, then a plain-code template. We ran this as a drill. The safe result was the same; the text is plainer and it took about 110 s.
+4. **What if Groq is down?** Chain: Groq 120B, Groq 20B, local Ollama model, then a plain-code template. The evidence second opinion tries Groq 20B then 120B; if both fail, a high-evidence alert is held for a person instead of acting alone. We ran this as a drill. Nothing unsafe happens; the text is plainer and it took about 110 s.
 5. **How do you stop prompt injection?** Notes are scanned by code before any AI, and are never sent to an AI. The injection case was rejected with zero AI calls. Honest limit: a filter is a pattern list, not a guarantee.
 6. **What does it cost?** About $0.00015 per request, measured on 31 runs. $0.22 a month at 50 a day is an assumption. Prices are from Groq's published list read on 21 Nov 2026.
 7. **How fast is it?** Median 4.4 s machine time, slowest 9.9 s, with the human wait removed. Local-model fallback is much slower.

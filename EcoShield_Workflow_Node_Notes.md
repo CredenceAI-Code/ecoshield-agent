@@ -1,12 +1,12 @@
 # EcoShield workflow notes: node by node (n8n)
 **On the n8n canvas every node name starts with its number, for example `1) Console form`, `2) Validate input`, `19b) Cloud call allowed?`, `37) Respond HTML`. The numbers match the node numbers in the Node Notes. This document uses the plain names.**
 
-All 42 nodes, in run order. A one-line **Job** first (what the node is for), then the same four lines for each: In, Does, Out, Why (plus Notes where there is something to know). The Code nodes are marked ★ (15 of them are explained in detail near the end, line by line, with a worked example using real numbers; the two new ones, 17b and 17e, are explained in their own entries). Before that there is a short guide to the shared code (core.js) and to the state object that travels through the workflow, because most Code nodes are built from them.
+All 43 nodes, in run order. A one-line **Job** first (what the node is for), then the same four lines for each: In, Does, Out, Why (plus Notes where there is something to know). The Code nodes are marked ★ (15 of them are explained in detail near the end, line by line, with a worked example using real numbers; the two new ones, 17b and 17f, are explained in their own entries). Before that there is a short guide to the shared code (core.js) and to the state object that travels through the workflow, because most Code nodes are built from them.
 
 Read in this order: Words used, then "How the code nodes are built", then the node list, then the detailed code sections.
 
 ## Words used in these notes
-- **Node:** one step in the workflow (42 in total, 17 of them Code nodes).
+- **Node:** one step in the workflow (43 in total, 17 of them Code nodes).
 - **Item:** the bundle of data passed from node to node. Here it is one big object called `st` (short for state).
 - **Trigger:** the node that starts a run. There are two: the Console form (runs the agent) and the Dashboard hook (shows the dashboard).
 - **Code node:** a node where we write JavaScript. All our logic lives in these.
@@ -208,13 +208,13 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Why:** The AI proposes; only the guard decides.
 - **Notes:** Detailed section 17. The loop Replan check, AI, Parse replan repeats at most 2 times.
 
-## Stage 3b: AI second opinion on the evidence level (nodes 17b to 17e), added Round 3 (option 3)
+## Stage 3b: AI second opinion on the evidence level (nodes 17b to 17f), added Round 3 (option 3)
 
 ### 17b. Evidence AI prompt (Code) ★
 - **Job:** Builds the plain-facts request for the AI's second opinion on how strong the leak evidence is.
 - **In:** `st` after the replan loop (or straight from Replan needed? for normal runs).
-- **Does:** If there is a leak finding and no alert is already open, takes `st.evidence_facts` (numbers only: flow in litres an hour, nights seen, longest run, lowest night flow each night, missing night readings, impossible readings set aside, meters disagreeing, age of the newest reading) and builds the request for the 20B model. The facts contain no score, no thresholds and nothing about who is in the building; a last regex check skips the cloud call if any occupancy-like word appears. In a Groq-outage drill the request is aimed at a model that does not exist, so the call fails on purpose.
-- **Out:** `st` with `ev_ai_needed` true or false and `ev_body` (the request).
+- **Does:** If there is a leak finding and no alert is already open, takes `st.evidence_facts` (numbers only: flow in litres an hour, nights seen, longest run, lowest night flow each night, missing night readings, impossible readings set aside, meters disagreeing, age of the newest reading) and builds two identical requests, one for the 20B model and one for the 120B model. The facts contain no score, no thresholds and nothing about who is in the building; a last regex check skips the cloud call if any occupancy-like word appears. In a Groq-outage drill both requests are aimed at a model that does not exist, so both calls fail on purpose.
+- **Out:** `st` with `ev_ai_needed` true or false, `ev_body` (20B request) and `ev_body120` (120B request).
 - **Why:** The organiser asked for the AI to do as much as possible without thresholds written in code. Here the AI judges the evidence from facts alone, while code keeps the final say.
 - **Notes:** Not in the detailed code sections below; the prompt asks the AI to count data problems, judge the flow, and answer HIGH, MEDIUM or LOW as JSON.
 
@@ -228,23 +228,30 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 ### 17d. Groq 20B evidence (HTTP Request)
 - **Job:** Asks the Groq 20B model for its HIGH, MEDIUM or LOW opinion.
 - **In:** `st.ev_body`.
-- **Does:** One call, temperature 0, 15 second wait limit, no retries. Both the answer and any error go on to Parse evidence.
+- **Does:** One call, temperature 0, 15 second wait limit, no retries. A good answer goes to Parse evidence. An error goes to Groq 120B evidence.
 - **Out:** the AI's raw reply, or an error.
-- **Why:** If it fails, the run just continues with the code's level. The AI is optional, never a dependency.
+- **Why:** The 20B is the main model for this step because it agreed with the code level most often in our held-out test (78% on 37 cases).
 
-### 17e. Parse evidence (Code) ★
+### 17e. Groq 120B evidence (HTTP Request)
+- **Job:** Fallback: asks the Groq 120B model for the same opinion if the 20B call failed.
+- **In:** the second request, `ev_body120`, read from Evidence AI prompt.
+- **Does:** One call, temperature 0, 15 second wait limit. Both the answer and any error go on to Parse evidence.
+- **Out:** the AI's raw reply, or an error.
+- **Why:** One more chance to get an opinion. In our test the 120B was more cautious (it held back more HIGH cases), which errs in the safe direction.
+
+### 17f. Parse evidence (Code) ★
 - **Job:** Reads the AI's opinion, or records that there was none.
 - **In:** The AI's reply (or an error) and `st` from Evidence AI prompt.
-- **Does:** Extracts the JSON, accepts only HIGH, MEDIUM or LOW, and stores `st.ev_ai` {level, confidence, data_problems, reason}. Anything unreadable means no opinion. Writes an `evidence_review` line to the audit log either way (with tokens used).
+- **Does:** Extracts the JSON, accepts only HIGH, MEDIUM or LOW, and stores `st.ev_ai` {level, confidence, data_problems, reason, provider}. Anything unreadable means no opinion. Writes an `evidence_review` line to the audit log either way (which model answered, tokens used).
 - **Out:** `st` with `ev_ai` (or null).
-- **Why:** An unusable AI answer must never block or change a run; the code level is used alone and the log says so.
+- **Why:** An unusable AI answer must never block or change a run. With no opinion, Auto actions fails closed: a code-HIGH is held for a named person instead of acting alone. A code MEDIUM or LOW stays as the code said.
 
 ## Stage 4: Automatic action and explanation (nodes 18 to 23)
 
 ### 18. Auto actions (Code) ★
 - **Job:** Raises the safe automatic alerts, depending on the final evidence level: code score and AI second opinion combined (HIGH auto, MEDIUM held for a person, LOW watch).
 - **In:** `st` (after the replan loop, or straight from Finished? for normal runs).
-- **Does:** If the leak check found LEAK, WATCH or INSUFFICIENT_DATA, combines the code's level (score 85 and up HIGH, 50 to 84 MEDIUM, under 50 LOW) with the AI's second opinion using a fixed rule: the agent acts alone only if code AND AI both say HIGH (alert raised automatically, logged, can be undone); if either says MEDIUM or higher, the alert is held until a named person approves; only if both say LOW does it raise nothing and just watch. If there is no usable AI answer, the code's level is used alone. The AI can hold an action back or ask for a review, but it can never make the agent act alone. The code level, the AI level and who decided are written to the audit log (`autonomy_level`). Skips if an alert is already open for this scenario.
+- **Does:** If the leak check found LEAK, WATCH or INSUFFICIENT_DATA, combines the code's level (score 85 and up HIGH, 50 to 84 MEDIUM, under 50 LOW) with the AI's second opinion using a fixed rule: the agent acts alone only if code AND AI both say HIGH (alert raised automatically, logged, can be undone); if either says MEDIUM or higher, the alert is held until a named person approves; only if both say LOW does it raise nothing and just watch. If no AI opinion can be obtained, a code-HIGH is held for a named person instead of acting alone (fail closed); a code MEDIUM or LOW stays as the code said. The AI can hold an action back or ask for a review, but it can never make the agent act alone. The code level, the AI level and who decided are written to the audit log (`autonomy_level`). Skips if an alert is already open for this scenario.
 - **Out:** `st` with `auto` {status DONE, HELD, WATCH_ONLY, NO_CHANGE or FAILED} and `autonomy`.
 - **Why:** Stage 7a: safe, low-risk work with strong evidence needs no person. Weak evidence never acts alone. Everything is still logged and reversible.
 - **Notes:** Detailed section 18.

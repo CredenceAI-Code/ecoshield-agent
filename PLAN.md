@@ -40,7 +40,7 @@ Source documents: the emailed problem statement (`../STATEMENT_ANALYSIS.md`) and
 |---|---|
 | `core.js` | ALL decision logic, plain code, no network: scenarios, synthetic data generator, leak detector, slab bill forecaster, note and feed validators, privacy `sanitize`, `heatGuard`, `applyReview`, `writeGateway`, planner allow-list (`runnable`, `deterministicNext`, `planView`), replan loop (`needsReplan`, `replanView`, `parseReplan`, `applyReplan`, `recordReview`), memory helpers. Run by tests in Node; pasted verbatim into n8n Code nodes. |
 | `page_js.js` | HTML builders for the result page and dashboard (`outcome`, `renderPage`, `renderDashboard`). |
-| `make_ecoshield_workflow.py` | Generates `ecoshield_workflow.json` (42 nodes, deterministic ids so the form URL never changes). `ECO_OLLAMA_ONLY=1` writes `tests/ollama_only_workflow.json` with Groq pointed at a dead port. |
+| `make_ecoshield_workflow.py` | Generates `ecoshield_workflow.json` (43 nodes, deterministic ids so the form URL never changes). `ECO_OLLAMA_ONLY=1` writes `tests/ollama_only_workflow.json` with Groq pointed at a dead port. |
 | `ecoshield_workflow.json`, `EcoShield_Agent_export_*_v*.json` | The importable workflow and dated copies. |
 | `export_csv.js`, `data/` | Synthetic dataset for judges: `smart_resource_meters.csv` (hourly rows, 14 scenarios), `scenarios.csv` (with expected verdict and guard rule per scenario), `sample_audit_excerpt.jsonl`. |
 | `tests/test_core.js` | Unit tests of every function in `core.js`, including thresholds and boundaries. |

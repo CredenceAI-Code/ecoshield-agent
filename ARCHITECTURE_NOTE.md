@@ -2,7 +2,7 @@
 **On the n8n canvas every node name starts with its number, for example `1) Console form`, `2) Validate input`, `19b) Cloud call allowed?`, `37) Respond HTML`. The numbers match the node numbers in the Node Notes. This document uses the plain names.**
 
 
-*Architecture note for judges. Written 2026-11-19 against the built workflow (v7, 42 nodes, `core.js`) and its tests. Synthetic data, DEWA published tariff (simplified, updated 2026-11-20), simulated device. It replaces the EcoWatch note (`../ARCHITECTURE_NOTE.md`), which described the earlier placeholder build.*
+*Architecture note for judges. Written 2026-11-19 against the built workflow (v7, 43 nodes, `core.js`) and its tests. Synthetic data, DEWA published tariff (simplified, updated 2026-11-20), simulated device. It replaces the EcoWatch note (`../ARCHITECTURE_NOTE.md`), which described the earlier placeholder build.*
 
 ## 30-second spoken version
 
@@ -47,7 +47,7 @@ The AI can make the system more cautious or leave it unchanged; it cannot loosen
 - **Occupancy privacy:** one allow-list function builds every outbound AI payload and an assertion re-checks it. The result page lists what was sent. A request to export occupancy is blocked (scenario 10). n8n runs on the laptop, not in the cloud.
 - **Heat-safety guard:** hard limits in one object (`LIMITS`) and one function (`heatGuard`). The write gateway checks them a second time.
 - **Human approval:** required for setpoint changes, main-valve shutoff and rollbacks. Forecasts are automatic. Whether a leak alert is automatic depends on the **evidence score**: HIGH (85 and up) raises it by itself, MEDIUM (50-84) holds it until a named person approves, LOW (under 50) raises nothing and watches. Code decides this; the AI never sees the score. Round 3 adds an AI second opinion on the level (from plain facts); the agent acts alone only if code AND AI both say HIGH, and either one saying MEDIUM or higher sends it to a named person.
-- **Evidence strength and adaptive autonomy:** `evidenceStrength` scores each leak verdict 0-100 (missing night readings, impossible readings, meter disagreement, stale feed, short history, weak signal) and lists every deduction on the result page. `autonomyFor` maps the score to what the agent may do alone. No score fails closed to watch only. `combineLevels` merges that level with an AI second opinion (workflow nodes 17b-17e); the AI can hold an action back or ask for review, never make the agent act alone.
+- **Evidence strength and adaptive autonomy:** `evidenceStrength` scores each leak verdict 0-100 (missing night readings, impossible readings, meter disagreement, stale feed, short history, weak signal) and lists every deduction on the result page. `autonomyFor` maps the score to what the agent may do alone. No score fails closed to watch only. `combineLevels` merges that level with an AI second opinion (workflow nodes 17b-17f, Groq 20B then 120B); the AI can hold an action back or ask for review, never make the agent act alone. If no AI opinion can be obtained, a code-HIGH is held for a named person (fail closed).
 
 ## Defence in layers
 

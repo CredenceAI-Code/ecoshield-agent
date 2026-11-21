@@ -271,7 +271,8 @@ if (st.request.type !== 'ROLLBACK' && st.data && st.data.ok && st.evidence && st
   if (/occup|presence|room|people|schedule|empty/i.test(user)) ev('code', 'evidence_review', { skipped: true, reason: 'occupancy-like text in the outbound facts, so no cloud call' });
   else {
     st.ev_ai_needed = true;
-    st.ev_body = { model: st.drill === 'groq_outage' ? 'drill-groq-outage' : 'openai/gpt-oss-20b', temperature: 0, max_tokens: 500, reasoning_effort: 'low', messages: [{ role: 'system', content: __EV_SYSTEM__ }, { role: 'user', content: user }] };
+    const mk = (m) => ({ model: st.drill === 'groq_outage' ? 'drill-groq-outage' : m, temperature: 0, max_tokens: 500, reasoning_effort: 'low', messages: [{ role: 'system', content: __EV_SYSTEM__ }, { role: 'user', content: user }] });
+    st.ev_body = mk('openai/gpt-oss-20b'); st.ev_body120 = mk('openai/gpt-oss-120b');
   }
 }
 return [{ json: st }];
@@ -280,14 +281,14 @@ return [{ json: st }];
 JS_EV_PARSE = CORE + r"""
 // ===== Reads the AI second opinion. Anything unusable means "no opinion": the code level is then used alone. =====
 const p = $('Evidence AI prompt').first().json, j = $json || {};
-const st = Object.assign({}, p); delete st.ev_body; st.trace = p.trace.slice();
+const st = Object.assign({}, p); delete st.ev_body; delete st.ev_body120; st.trace = p.trace.slice();
 const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
 let raw = '', ai = null, tokIn = null, tokOut = null;
 if (j.choices && j.choices[0] && j.choices[0].message) { raw = String(j.choices[0].message.content || ''); if (j.usage) { tokIn = j.usage.prompt_tokens || null; tokOut = j.usage.completion_tokens || null; } }
 const m = raw.match(/\{[\s\S]*?\}/);
-if (m) { try { const o = JSON.parse(m[0]); const lv = String(o.level || '').toUpperCase(); if (['HIGH', 'MEDIUM', 'LOW'].indexOf(lv) >= 0) ai = { level: lv, confidence: +o.confidence || null, data_problems: (o.data_problems === undefined ? null : o.data_problems), reason: String(o.reason || '').replace(/[<>]/g, '').slice(0, 200), provider: 'groq-20b' }; } catch (e) {} }
+if (m) { try { const o = JSON.parse(m[0]); const lv = String(o.level || '').toUpperCase(); if (['HIGH', 'MEDIUM', 'LOW'].indexOf(lv) >= 0) ai = { level: lv, confidence: +o.confidence || null, data_problems: (o.data_problems === undefined ? null : o.data_problems), reason: String(o.reason || '').replace(/[<>]/g, '').slice(0, 200), provider: /120b/.test(String(j.model || '')) ? 'groq-120b' : 'groq-20b' }; } catch (e) {} }
 st.ev_ai = ai; st.ev_ai_needed = false;
-ev('llm', 'evidence_review', ai ? { level: ai.level, confidence: ai.confidence, data_problems: ai.data_problems, reason: ai.reason, by: 'groq-20b', tokens_in: tokIn, tokens_out: tokOut } : { ok: false, note: 'no usable AI answer, so the code level is used alone', by: 'none' });
+ev('llm', 'evidence_review', ai ? { level: ai.level, confidence: ai.confidence, data_problems: ai.data_problems, reason: ai.reason, by: ai.provider, tokens_in: tokIn, tokens_out: tokOut } : { ok: false, note: 'no usable AI answer, so a code-HIGH is held for a person', by: 'none' });
 return [{ json: st }];
 """
 
@@ -304,8 +305,8 @@ if (st.request.type !== 'ROLLBACK' && st.data && st.data.ok && ['LEAK', 'WATCH',
     // Auto-act only if code AND AI both say HIGH; a person reviews if either says MEDIUM or higher; both LOW = watch only. The AI can never make the agent act alone.
     const comb = combineLevels(st.evidence ? st.evidence.level : null, st.ev_ai ? st.ev_ai.level : null);
     const evx = st.evidence ? Object.assign({}, st.evidence, { level: comb.level }) : st.evidence;
-    const aut = autonomyFor(evx); aut.code_level = st.evidence ? st.evidence.level : null; aut.ai_level = st.ev_ai ? st.ev_ai.level : null; aut.source = comb.source;
-    if (st.ev_ai) aut.text += ' Code said ' + aut.code_level + ', the AI said ' + st.ev_ai.level + ': ' + comb.source + '.';
+    const aut = autonomyFor(evx); if (aut.level === 'MEDIUM' && st.evidence && st.evidence.level !== 'MEDIUM') aut.text = 'Evidence score ' + st.evidence.score + '/100 (' + st.evidence.level + '), but the alert is held until a named person approves.'; aut.code_level = st.evidence ? st.evidence.level : null; aut.ai_level = st.ev_ai ? st.ev_ai.level : null; aut.source = comb.source;
+    aut.text += ' Code said ' + aut.code_level + ', the AI ' + (st.ev_ai ? 'said ' + st.ev_ai.level : 'gave no opinion') + ': ' + comb.source + '.';
     st.autonomy = aut;
     const alert = { id: 'AL-' + st.run_id, scenario: st.scenario.id, verdict: v, est_lph: st.leak.est_lph || 0, at: new Date().toISOString(), open: true };
     if (aut.alert === 'watch') st.auto = { status: 'WATCH_ONLY', text: aut.text };
@@ -518,6 +519,7 @@ code("Parse replan", JS_PARSE_REPLAN, 2640, 20)
 code("Evidence AI prompt", JS_EV_PROMPT, 3120, 480)
 if_true("AI evidence needed?", "={{ $json.ev_ai_needed }}", 3380, 480)
 groq_http("Groq 20B evidence", "$json.ev_body", 15000, False, 3640, 480)
+groq_http("Groq 120B evidence", "$('Evidence AI prompt').first().json.ev_body120", 15000, False, 3900, 560)
 code("Parse evidence", JS_EV_PARSE, 3900, 480)
 code("Auto actions", JS_AUTO, 2400, 200)
 code("Build LLM prompt", JS_BUILD_LLM, 2640, 200)
@@ -593,7 +595,9 @@ link("Evidence AI prompt", "AI evidence needed?")
 link("AI evidence needed?", "Groq 20B evidence", 0)
 link("AI evidence needed?", "Auto actions", 1)
 link("Groq 20B evidence", "Parse evidence", 0)
-link("Groq 20B evidence", "Parse evidence", 1)
+link("Groq 20B evidence", "Groq 120B evidence", 1)
+link("Groq 120B evidence", "Parse evidence", 0)
+link("Groq 120B evidence", "Parse evidence", 1)
 link("Parse evidence", "Auto actions")
 link("Groq replan", "Parse replan", 0)
 link("Groq replan", "Groq 20B replan", 1)
@@ -639,7 +643,7 @@ LAYOUT = {
     "Parse plan": (2080, 0), "Finished?": (2340, 0), "Run tool": (2340, -240),
     "Replan check": (2600, 0), "Replan needed?": (2860, 0),
     "Groq replan": (3120, 240), "Groq 20B replan": (3380, 240), "Ollama replan": (3640, 240), "Parse replan": (3900, 240),
-    "Auto actions": (3120, 0), "Evidence AI prompt": (3120, 480), "AI evidence needed?": (3380, 480), "Groq 20B evidence": (3640, 480), "Parse evidence": (3900, 480), "Build LLM prompt": (3380, 0), "Cloud call allowed?": (3640, 0),
+    "Auto actions": (3120, 0), "Evidence AI prompt": (3120, 480), "AI evidence needed?": (3380, 480), "Groq 20B evidence": (3640, 480), "Groq 120B evidence": (3900, 560), "Parse evidence": (4160, 480), "Build LLM prompt": (3380, 0), "Cloud call allowed?": (3640, 0),
     "Groq explain": (3900, -240), "Groq 20B explain": (4160, -240), "Ollama explain": (4420, -240), "Parse LLM": (4680, 0),
     "Needs approval?": (4940, 0), "Approval form": (5200, 0), "Approve and write": (5460, 0),
     "Needs review?": (5200, 240), "Review form": (5460, 240), "Record review": (5720, 240), "No write": (5460, 480),
@@ -655,7 +659,7 @@ for _n in nodes:
 _ORDER = [("1", "Console form"), ("2", "Validate input"), ("3", "Input accepted?"), ("4", "Plan state"), ("5", "Ask planner LLM?"),
           ("6", "Groq plan"), ("7", "Groq 20B plan"), ("8", "Ollama plan"), ("9", "Parse plan"), ("10", "Finished?"), ("11", "Run tool"),
           ("12", "Replan check"), ("13", "Replan needed?"), ("14", "Groq replan"), ("15", "Groq 20B replan"), ("16", "Ollama replan"),
-          ("17", "Parse replan"), ("17b", "Evidence AI prompt"), ("17c", "AI evidence needed?"), ("17d", "Groq 20B evidence"), ("17e", "Parse evidence"), ("18", "Auto actions"), ("19", "Build LLM prompt"), ("19b", "Cloud call allowed?"),
+          ("17", "Parse replan"), ("17b", "Evidence AI prompt"), ("17c", "AI evidence needed?"), ("17d", "Groq 20B evidence"), ("17e", "Groq 120B evidence"), ("17f", "Parse evidence"), ("18", "Auto actions"), ("19", "Build LLM prompt"), ("19b", "Cloud call allowed?"),
           ("20", "Groq explain"), ("21", "Groq 20B explain"), ("22", "Ollama explain"), ("23", "Parse LLM"),
           ("24", "Needs approval?"), ("25", "Approval form"), ("26", "Approve and write"), ("27", "Needs review?"), ("28", "Review form"),
           ("29", "Record review"), ("30", "No write"), ("31", "Save memory"), ("32", "Build page"), ("33", "Write audit log"),
