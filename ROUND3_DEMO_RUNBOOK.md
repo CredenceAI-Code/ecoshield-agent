@@ -1,6 +1,6 @@
 # EcoShield: Round 3 demo runbook
 
-For the live demo at the finale. Everything runs **on this laptop**; judges cannot reach it from outside. The hosted page is a simulation of the logic (see "If something fails").
+For the live demo at the finale. Everything runs **on this laptop**; judges cannot reach it from outside. The hosted page (public, now with CSV upload) is a simulation of the logic (see "If something fails").
 
 ## 1. Before you leave home (pre-flight, 10 minutes)
 
@@ -23,7 +23,7 @@ For the live demo at the finale. Everything runs **on this laptop**; judges cann
 
 | # | What you do | What the judges see | Say |
 |---|---|---|---|
-| 1 | Form: scenario **1 - Overnight hidden pipe leak**, upload `2_overnight_leak_45lph.csv`, Submit | Result page: **LEAK, about 45 L/h**, evidence score 100 (HIGH), the AI explanation, an approval form | "Real data in: a meter export, not a canned dropdown." |
+| 1 | Form: scenario **1 - Overnight hidden pipe leak**, upload `2_overnight_leak_45lph.csv`, Submit | Result page: **LEAK, about 45 L/h**, evidence score 100 (HIGH), "Code HIGH, AI HIGH" on the result page, the AI explanation, an approval form | "Real data in: a meter export, not a canned dropdown." |
 | 2 | On the approval form pick **Approve**, type your full name, Submit | "Approved by <name> and applied: close the main water valve" | "A named person signs. The AI cannot." |
 | 3 | Form again: scenario 2, upload `7_bad_file_missing_columns.csv` | Rejected before any AI, reason shown | "Bad input never reaches the AI." |
 | 4 | Form: scenario **11** (injection note), no file | Rejected before any AI saw it | "Prompt injection stopped by code." |

@@ -15,6 +15,7 @@ const stub = (mode) => async (name, body) => {
   if (name === 'Ollama plan') { return mode.ollama === 'ok' ? { ok: true, json: { message: { content: '<think>x</think>{"next":"check_safety_guard","why":"local"}' } } } : { ok: false, json: { error: 'ollama down' } }; }
   if (name === 'Groq explain') return mode.explain === 'fail' ? { ok: false, json: { error: '429' } } : (mode.explain === 'bypass' ? { ok: true, json: { choices: [{ message: { content: JSON.stringify({ headline: 'Cooling stays on', explanation: 'The request was stopped.', tip: 'Consider a temporary override if the rule allows it later.' }) } }] } } : mode.explain === 'invent' ? { ok: true, json: { choices: [{ message: { content: JSON.stringify({ headline: 'h', explanation: 'It will cost AED 99999 extra.', tip: 't' }) } }] } } : explainOk(body));
   if (name === 'Ollama explain') return { ok: true, json: { message: { content: JSON.stringify({ headline: 'Local answer', explanation: 'Written by the local model.', tip: 'Review it.' }) }, prompt_eval_count: 5, eval_count: 9 } };
+  if (name === 'Groq 20B evidence') return mode.ev ? { ok: true, json: { choices: [{ message: { content: typeof mode.ev === 'string' ? mode.ev : JSON.stringify(mode.ev) } }], usage: { prompt_tokens: 400, completion_tokens: 60 } } } : { ok: false, json: { error: 'down' } };
   if (/^Groq 20B/.test(name)) {
     if (!mode.g8) return { ok: false, json: { error: '8b down' } };
     const tag = (r) => { r.json.model = 'openai/gpt-oss-20b'; return r; };
@@ -195,7 +196,26 @@ const approve = (who) => () => ({ Decision: 'Approve', Reviewer: who });
   ok(d(r).auto.status === 'HELD' && mem().devices[4].alerts.length === 0, 'MEDIUM evidence, approval with no name: ignored, alert stays held');
   r = await go(label(9));
   ok(d(r).auto.status === 'WATCH_ONLY' && mem().devices[9].alerts.length === 0 && /Not raised: the evidence is too weak/.test(page(r)), 'LOW evidence: nothing raised, page says so');
-  ok(r.httpLog.every(h => !/evidence|autonomy/i.test(JSON.stringify(h.body))), 'LOW evidence run: the score never appears in any AI request body');
+  ok(r.httpLog.filter(h => h.node !== 'Groq 20B evidence').every(h => !/evidence|autonomy/i.test(JSON.stringify(h.body))), 'LOW evidence run: the score never appears in any other AI request body');
+  // option 3: AI second opinion on the evidence level, combined by a fixed rule
+  const evx = (lv) => ({ level: lv, confidence: 80, data_problems: 0, reason: 'test opinion' });
+  await go('RESET - clear the demo memory'); r = await go(label(1), { ev: evx('HIGH') });
+  ok(d(r).evidence.level === 'HIGH' && d(r).ev_ai && d(r).ev_ai.level === 'HIGH' && d(r).autonomy.level === 'HIGH' && d(r).auto.status === 'DONE', 'option 3: code HIGH + AI HIGH -> acts alone');
+  ok(d(r).trace.some(t => t.step === 'evidence_review' && t.detail.level === 'HIGH') && d(r).trace.some(t => t.step === 'autonomy_level' && t.detail.code_level === 'HIGH' && t.detail.ai_level === 'HIGH'), 'option 3: both levels are written to the audit trail');
+  { const hb = r.httpLog.filter(h => h.node === 'Groq 20B evidence'); ok(hb.length === 1 && !/score|autonomy|threshold|HIGH_MIN|85|100/.test(hb[0].body.messages[1].content) && !OCC.test(hb[0].body.messages[1].content), 'option 3: the AI is shown plain facts only (no score, no thresholds, no occupancy words)'); }
+  await go('RESET - clear the demo memory'); r = await go(label(1), { ev: evx('MEDIUM') }, () => ({ Decision: 'Reject', Reviewer: 'Asha' }));
+  ok(d(r).evidence.level === 'HIGH' && d(r).autonomy.level === 'MEDIUM' && d(r).auto.status === 'HELD' && mem().devices[1].alerts.length === 0 && /held back/.test(d(r).autonomy.source), 'option 3: code HIGH + AI MEDIUM -> the AI holds back the automatic action; a person must approve');
+  await go('RESET - clear the demo memory'); r = await go(label(1), { ev: evx('LOW') }, () => ({ Decision: 'Reject', Reviewer: 'Asha' }));
+  ok(d(r).autonomy.level === 'MEDIUM' && d(r).auto.status === 'HELD', 'option 3: code HIGH + AI LOW -> still goes to a person, never silenced');
+  await go('RESET - clear the demo memory'); r = await go(label(9), { ev: evx('HIGH') }, () => ({ Decision: 'Reject', Reviewer: 'Asha' }));
+  ok(d(r).evidence.level === 'LOW' && d(r).autonomy.level === 'MEDIUM' && d(r).auto.status === 'HELD' && mem().devices[9].alerts.length === 0, 'option 3: code LOW + AI HIGH -> a person looks, the AI cannot make the agent act alone');
+  await go('RESET - clear the demo memory'); r = await go(label(1), { ev: 'not json at all' });
+  ok(d(r).ev_ai === null && d(r).autonomy.level === 'HIGH' && d(r).auto.status === 'DONE' && /code only/.test(d(r).autonomy.source) && d(r).trace.some(t => t.step === 'evidence_review' && t.detail.ok === false), 'option 3: unusable AI answer -> code level used alone, and the log says so');
+  await go('RESET - clear the demo memory'); r = await go(label(1), { ev: { level: 'MAYBE' } });
+  ok(d(r).ev_ai === null && d(r).auto.status === 'DONE', 'option 3: an invalid level word is ignored');
+  await go('RESET - clear the demo memory'); r = await go(label(1), {});
+  ok(d(r).ev_ai === null && d(r).auto.status === 'DONE', 'option 3: AI down -> code level alone, agent still works');
+  ok(/AI second opinion/.test(page(await go(label(1), { ev: evx('HIGH') }))), 'option 3: result page shows the AI second opinion');
 
   // HS-5.5: room sensor offline -> that room is assumed occupied and hot, nothing is raised for it; the other empty rooms can be proposed 27 C
   await go('RESET - clear the demo memory');

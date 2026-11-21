@@ -203,7 +203,7 @@ if (st.choice === 'read_meter_data') {
   ev('tool', 'read_meter_data', { stays_on_device: true, source: rec.source, validation: st.data });
 } else if (st.choice === 'run_leak_and_bill_forecaster') {
   const rec2 = recordFor(st, sid); (st.edits || []).forEach(e => { const r = rec2.rows.find(x => x.day === e.day && x.hour === e.hour); if (r) r.water_lph = e.v; });
-  const out = run_leak_and_bill_forecaster(sid, rec2.rows, rec2.now); st.leak = out.leak; st.bill = out.bill; st.set_aside = out.set_aside; st.evidence = out.evidence;
+  const out = run_leak_and_bill_forecaster(sid, rec2.rows, rec2.now); st.leak = out.leak; st.bill = out.bill; st.set_aside = out.set_aside; st.evidence = out.evidence; st.evidence_facts = out.evidence_facts;
   ev('tool', 'run_leak_and_bill_forecaster', { leak: out.leak.verdict, evidence_score: out.evidence.score, evidence_level: out.evidence.level, evidence_reasons: out.evidence.reasons, set_aside_readings: out.set_aside, est_lph: out.leak.est_lph, month_bill_aed: out.bill.with_leak.total_aed, tariff_verified: TARIFF.verified });
 } else if (st.choice === 'lookup_case_history') {
   st.history_info = lookupHistory(sd.mem, sid, st.request.type); ev('memory', 'lookup_case_history', st.history_info);
@@ -258,6 +258,39 @@ ev('tool', 'write_gateway', { skipped: true, reason: 'the guard blocked the requ
 return [{ json: st }];
 """
 
+EV_SYSTEM_TEXT = "You review the evidence behind a school water-leak finding made by a monitoring tool, and decide how much the system may do on its own.\nHIGH: the evidence is strong and the data is clean; the system may raise the leak alert by itself (low risk, can be undone).\nMEDIUM: the evidence is worth a person's attention but has weaknesses; a named person must approve before the alert is raised.\nLOW: the evidence is too weak to bother anyone; raise nothing, only keep watching.\nWork in two steps, from the facts only.\nStep 1, count the data problems: (a) any missing night readings, (b) any impossible readings that had to be set aside, (c) any readings where the two meters disagree, (d) a newest reading that is more than one reporting interval old (the meter reports once an hour, so a reading from several hours ago is stale).\nStep 2, judge the flow itself: a large, steady flow seen on several nights in a row is strong; a small flow or one seen on few nights is weaker; a verdict of WATCH means the flow is below the leak rule, so it is weak evidence by itself.\nThen decide. The two mistakes are not equal: a wrong HIGH acts without a person, but a wrong LOW means a real leak is never reported. So:\n- HIGH only when the flow is strong AND there are no data problems (or only trivial ones).\n- LOW only when the flow itself is weak, small or absent.\n- A strong flow with data problems is MEDIUM, so that a person can check it.\nReply with JSON only: {\"data_problems\":N,\"level\":\"HIGH|MEDIUM|LOW\",\"confidence\":0-100,\"reason\":\"one short sentence\"}"
+
+JS_EV_PROMPT = (CORE + r"""
+// ===== AI second opinion on the evidence level (option 3). The AI sees plain facts only: no score, no thresholds, nothing about who is in the building. =====
+const st = Object.assign({}, $json); st.trace = st.trace.slice();
+const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
+const v = st.leak ? st.leak.verdict : 'NOT_RUN';
+st.ev_ai = null; st.ev_ai_needed = false;
+if (st.request.type !== 'ROLLBACK' && st.data && st.data.ok && st.evidence && st.evidence_facts && ['LEAK', 'WATCH', 'INSUFFICIENT_DATA'].indexOf(v) >= 0 && !(st.device.alerts || []).some(a => a.open && a.scenario === st.scenario.id)) {
+  const user = 'Facts:\n' + JSON.stringify(st.evidence_facts, null, 1);
+  if (/occup|presence|room|people|schedule|empty/i.test(user)) ev('code', 'evidence_review', { skipped: true, reason: 'occupancy-like text in the outbound facts, so no cloud call' });
+  else {
+    st.ev_ai_needed = true;
+    st.ev_body = { model: st.drill === 'groq_outage' ? 'drill-groq-outage' : 'openai/gpt-oss-20b', temperature: 0, max_tokens: 500, reasoning_effort: 'low', messages: [{ role: 'system', content: __EV_SYSTEM__ }, { role: 'user', content: user }] };
+  }
+}
+return [{ json: st }];
+""").replace("__EV_SYSTEM__", json.dumps(EV_SYSTEM_TEXT))
+
+JS_EV_PARSE = CORE + r"""
+// ===== Reads the AI second opinion. Anything unusable means "no opinion": the code level is then used alone. =====
+const p = $('Evidence AI prompt').first().json, j = $json || {};
+const st = Object.assign({}, p); delete st.ev_body; st.trace = p.trace.slice();
+const ev = (actor, step, detail) => st.trace.push({ ts: new Date().toISOString(), run_id: st.run_id, actor, step, detail });
+let raw = '', ai = null, tokIn = null, tokOut = null;
+if (j.choices && j.choices[0] && j.choices[0].message) { raw = String(j.choices[0].message.content || ''); if (j.usage) { tokIn = j.usage.prompt_tokens || null; tokOut = j.usage.completion_tokens || null; } }
+const m = raw.match(/\{[\s\S]*?\}/);
+if (m) { try { const o = JSON.parse(m[0]); const lv = String(o.level || '').toUpperCase(); if (['HIGH', 'MEDIUM', 'LOW'].indexOf(lv) >= 0) ai = { level: lv, confidence: +o.confidence || null, data_problems: (o.data_problems === undefined ? null : o.data_problems), reason: String(o.reason || '').replace(/[<>]/g, '').slice(0, 200), provider: 'groq-20b' }; } catch (e) {} }
+st.ev_ai = ai; st.ev_ai_needed = false;
+ev('llm', 'evidence_review', ai ? { level: ai.level, confidence: ai.confidence, data_problems: ai.data_problems, reason: ai.reason, by: 'groq-20b', tokens_in: tokIn, tokens_out: tokOut } : { ok: false, note: 'no usable AI answer, so the code level is used alone', by: 'none' });
+return [{ json: st }];
+"""
+
 JS_AUTO = CORE + r"""
 // ===== Stage 7a: low-risk, inside every limit: runs automatically, still logged, still reversible =====
 const st = Object.assign({}, $json); st.trace = st.trace.slice();
@@ -267,8 +300,13 @@ if (st.request.type !== 'ROLLBACK' && st.data && st.data.ok && ['LEAK', 'WATCH',
   if ((st.device.alerts || []).some(a => a.open && a.scenario === st.scenario.id)) {
     st.auto = { status: 'NO_CHANGE', text: 'A leak alert is already open for this scenario, so it was not raised again.' };
   } else {
-    // Adaptive autonomy: CODE maps the evidence score to what the agent may do alone (HIGH auto, MEDIUM a person approves, LOW watch only)
-    const aut = autonomyFor(st.evidence); st.autonomy = aut;
+    // Adaptive autonomy, option 3: CODE scores the evidence, the AI gives an independent second opinion, a fixed rule combines them.
+    // Auto-act only if code AND AI both say HIGH; a person reviews if either says MEDIUM or higher; both LOW = watch only. The AI can never make the agent act alone.
+    const comb = combineLevels(st.evidence ? st.evidence.level : null, st.ev_ai ? st.ev_ai.level : null);
+    const evx = st.evidence ? Object.assign({}, st.evidence, { level: comb.level }) : st.evidence;
+    const aut = autonomyFor(evx); aut.code_level = st.evidence ? st.evidence.level : null; aut.ai_level = st.ev_ai ? st.ev_ai.level : null; aut.source = comb.source;
+    if (st.ev_ai) aut.text += ' Code said ' + aut.code_level + ', the AI said ' + st.ev_ai.level + ': ' + comb.source + '.';
+    st.autonomy = aut;
     const alert = { id: 'AL-' + st.run_id, scenario: st.scenario.id, verdict: v, est_lph: st.leak.est_lph || 0, at: new Date().toISOString(), open: true };
     if (aut.alert === 'watch') st.auto = { status: 'WATCH_ONLY', text: aut.text };
     else if (aut.alert === 'approve') st.auto = { status: 'HELD', text: aut.text, alert };
@@ -278,7 +316,7 @@ if (st.request.type !== 'ROLLBACK' && st.data && st.data.ok && ['LEAK', 'WATCH',
       const gw = g.status === 'AUTO' ? writeGateway(req, st.state, st.device) : { ok: false, error: 'guard did not allow it', device: st.device, before: st.device };
       if (gw.ok) { st.device = gw.device; st.auto = { status: 'DONE', alert, before: gw.before, after: gw.device }; } else st.auto = { status: 'FAILED', error: gw.error };
     }
-    ev('code', 'autonomy_level', { level: aut.level, alert_mode: aut.alert, evidence_score: st.evidence ? st.evidence.score : null, text: aut.text });
+    ev('code', 'autonomy_level', { level: aut.level, alert_mode: aut.alert, evidence_score: st.evidence ? st.evidence.score : null, code_level: aut.code_level, ai_level: aut.ai_level, combined_by: aut.source, text: aut.text });
   }
   ev('tool', 'auto_action', { verdict: v, result: st.auto.status, alert: st.auto.status === 'DONE' ? st.auto.alert.id : null, note: st.auto.text || st.auto.error || 'alert written through the gateway; snapshot kept for undo' });
 } else ev('code', 'auto_action', { skipped: true, reason: 'no leak verdict, or request is a rollback, or data untrusted' });
@@ -477,6 +515,10 @@ groq_http("Groq replan", "$json.replanBodies.groq", 15000, False, 2400, 20)
 groq_http("Groq 20B replan", "$('Replan check').first().json.replanBodies.groq20", 15000, False, 2400, -60)
 ollama_http("Ollama replan", "$('Replan check').first().json.replanBodies.ollama", 60000, 2400, -140)
 code("Parse replan", JS_PARSE_REPLAN, 2640, 20)
+code("Evidence AI prompt", JS_EV_PROMPT, 3120, 480)
+if_true("AI evidence needed?", "={{ $json.ev_ai_needed }}", 3380, 480)
+groq_http("Groq 20B evidence", "$json.ev_body", 15000, False, 3640, 480)
+code("Parse evidence", JS_EV_PARSE, 3900, 480)
 code("Auto actions", JS_AUTO, 2400, 200)
 code("Build LLM prompt", JS_BUILD_LLM, 2640, 200)
 groq_http("Groq explain", "$json.llm.groqBody", 30000, True, 2880, 200)
@@ -546,7 +588,13 @@ link("Parse plan", "Finished?")
 link("Finished?", "Replan check", 0)
 link("Replan check", "Replan needed?")
 link("Replan needed?", "Groq replan", 0)
-link("Replan needed?", "Auto actions", 1)
+link("Replan needed?", "Evidence AI prompt", 1)
+link("Evidence AI prompt", "AI evidence needed?")
+link("AI evidence needed?", "Groq 20B evidence", 0)
+link("AI evidence needed?", "Auto actions", 1)
+link("Groq 20B evidence", "Parse evidence", 0)
+link("Groq 20B evidence", "Parse evidence", 1)
+link("Parse evidence", "Auto actions")
 link("Groq replan", "Parse replan", 0)
 link("Groq replan", "Groq 20B replan", 1)
 link("Groq 20B replan", "Parse replan", 0)
@@ -591,7 +639,7 @@ LAYOUT = {
     "Parse plan": (2080, 0), "Finished?": (2340, 0), "Run tool": (2340, -240),
     "Replan check": (2600, 0), "Replan needed?": (2860, 0),
     "Groq replan": (3120, 240), "Groq 20B replan": (3380, 240), "Ollama replan": (3640, 240), "Parse replan": (3900, 240),
-    "Auto actions": (3120, 0), "Build LLM prompt": (3380, 0), "Cloud call allowed?": (3640, 0),
+    "Auto actions": (3120, 0), "Evidence AI prompt": (3120, 480), "AI evidence needed?": (3380, 480), "Groq 20B evidence": (3640, 480), "Parse evidence": (3900, 480), "Build LLM prompt": (3380, 0), "Cloud call allowed?": (3640, 0),
     "Groq explain": (3900, -240), "Groq 20B explain": (4160, -240), "Ollama explain": (4420, -240), "Parse LLM": (4680, 0),
     "Needs approval?": (4940, 0), "Approval form": (5200, 0), "Approve and write": (5460, 0),
     "Needs review?": (5200, 240), "Review form": (5460, 240), "Record review": (5720, 240), "No write": (5460, 480),
@@ -607,7 +655,7 @@ for _n in nodes:
 _ORDER = [("1", "Console form"), ("2", "Validate input"), ("3", "Input accepted?"), ("4", "Plan state"), ("5", "Ask planner LLM?"),
           ("6", "Groq plan"), ("7", "Groq 20B plan"), ("8", "Ollama plan"), ("9", "Parse plan"), ("10", "Finished?"), ("11", "Run tool"),
           ("12", "Replan check"), ("13", "Replan needed?"), ("14", "Groq replan"), ("15", "Groq 20B replan"), ("16", "Ollama replan"),
-          ("17", "Parse replan"), ("18", "Auto actions"), ("19", "Build LLM prompt"), ("19b", "Cloud call allowed?"),
+          ("17", "Parse replan"), ("17b", "Evidence AI prompt"), ("17c", "AI evidence needed?"), ("17d", "Groq 20B evidence"), ("17e", "Parse evidence"), ("18", "Auto actions"), ("19", "Build LLM prompt"), ("19b", "Cloud call allowed?"),
           ("20", "Groq explain"), ("21", "Groq 20B explain"), ("22", "Ollama explain"), ("23", "Parse LLM"),
           ("24", "Needs approval?"), ("25", "Approval form"), ("26", "Approve and write"), ("27", "Needs review?"), ("28", "Review form"),
           ("29", "Record review"), ("30", "No write"), ("31", "Save memory"), ("32", "Build page"), ("33", "Write audit log"),

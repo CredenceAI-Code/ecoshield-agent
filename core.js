@@ -149,7 +149,7 @@ function run_leak_and_bill_forecaster(id, rowsIn, nowIn) {
   const q = quarantineBadReadings(rowsIn || rec.rows);
   const leak = detectLeak(q.rows), bill = forecastBill(q.rows, leak, now.hour);
   const slabs = bill.with_leak.electricity.steps.length;
-  return { scenario_id: +id, leak, bill, elec_slab_count: slabs, set_aside: q.set_aside, evidence: evidenceStrength(q.rows, leak, q.set_aside.length, now.hour) };
+  return { scenario_id: +id, leak, bill, elec_slab_count: slabs, set_aside: q.set_aside, evidence: evidenceStrength(q.rows, leak, q.set_aside.length, now.hour), evidence_facts: evidenceFacts(q.rows, leak, q.set_aside.length, now.hour) };
 }
 
 // ---------- Round 3: the real trigger. A meter export (CSV) replaces the canned scenario data ----------
@@ -204,6 +204,28 @@ function recordFor(st, id) {
 // A verdict is not equally trustworthy on every feed. The score (0-100) starts at 100 and loses points for each weakness in the evidence;
 // every deduction is listed with its reason. Code then maps the score to how much the agent may do on its own.
 const EVIDENCE = { HIGH_MIN: 85, MEDIUM_MIN: 50 };
+// Plain facts handed to the AI second opinion: numbers only, no score, no thresholds, nothing about who is in the building.
+function evidenceFacts(rows, leak, setAsideCount, nowHour) {
+  const L = LIMITS; let tot = 0, miss = 0, dis = 0;
+  for (let d = Math.max(1, TODAY - 7); d <= TODAY; d++) rows.filter(r => r.day === d && r.hour >= L.NIGHT_FIRST && r.hour <= L.NIGHT_LAST && r.occupied === 0).forEach(r => { tot++; if (r.water_lph === null) miss++; });
+  rows.forEach(r => { if (typeof r.water_lph === 'number' && typeof r.water_b_lph === 'number' && Math.abs(r.water_lph - r.water_b_lph) > Math.max(5, 0.3 * Math.max(r.water_lph, r.water_b_lph))) dis++; });
+  const last = rows[rows.length - 1], age = last ? (TODAY - last.day) * 24 + (nowHour - last.hour) : 99, lk = leak || {};
+  return { verdict: lk.verdict, estimated_leak_litres_per_hour: lk.est_lph || 0, nights_with_the_flow_seen: lk.flagged_nights || 0, longest_unbroken_night_flow_hours: lk.longest_run_hours || 0,
+    lowest_night_flow_each_of_last_8_nights_Lph: (lk.nights || []).slice(-8).map(n => n.min), night_readings_missing: miss + ' of ' + tot, impossible_readings_set_aside: setAsideCount || 0,
+    readings_where_the_two_water_meters_disagree: dis, meter_reports_every: 'once an hour', hours_since_newest_reading: age };
+}
+// Option 3 (code + AI): act alone ONLY if code AND AI both say HIGH. If EITHER says MEDIUM or higher, a named person reviews. Both LOW = watch only.
+// The AI can hold an action back or ask for a review; it can never make the system act alone, and it can never silence an alert the code wanted raised for review.
+const LEVEL_RANK = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+function combineLevels(codeLevel, aiLevel) {
+  if (!LEVEL_RANK.hasOwnProperty(codeLevel)) return { level: codeLevel, source: 'no code level' };
+  if (!aiLevel || !LEVEL_RANK.hasOwnProperty(aiLevel)) return { level: codeLevel, source: 'code only (no usable AI answer)' };
+  if (codeLevel === 'HIGH' && aiLevel === 'HIGH') return { level: 'HIGH', source: 'code and AI agree' };
+  if (codeLevel === 'LOW' && aiLevel === 'LOW') return { level: 'LOW', source: 'code and AI agree' };
+  if (codeLevel === aiLevel) return { level: 'MEDIUM', source: 'code and AI agree' };
+  if (LEVEL_RANK[aiLevel] > LEVEL_RANK[codeLevel]) return { level: 'MEDIUM', source: 'the AI asked for a person to look' };
+  return { level: 'MEDIUM', source: codeLevel === 'HIGH' ? 'the AI held back the automatic action' : 'the code asked for a person to look' };
+}
 function evidenceStrength(rows, leak, setAsideCount, nowHour) {
   const L = LIMITS, parts = [];
   const take = (key, pts, why) => { const p = Math.round(pts); if (p > 0) parts.push({ key, points: p, why }); };
@@ -439,4 +461,4 @@ function lookupHistory(mem, sid, reqType) {
   return { open_alert: (dev.alerts || []).some(a => a.open), last_decision: dec, prior_runs: (mem.history || []).filter(h => h.scenario_id === sid).length };
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { planRoomSetpoints, ROOMS, evidenceStrength, autonomyFor, EVIDENCE, quarantineBadReadings, LIMITS, TARIFF, SCENARIOS, EXTRA_SCENARIOS, ALL_SCENARIOS, MAX_STEPS, MAX_INVALID_PICKS, MAX_REPLANS, REPLANNABLE, needsReplan, replanView, parseReplan, applyReplan, recordReview, genScenario, get_local_meter_and_occupancy, detectLeak, slabCost, billFor, forecastBill, run_leak_and_bill_forecaster, validateNote, validateMeterRows, sanitize, buildOutbound, PUBLIC_RULE, heatGuard, applyReview, defaultDevice, writeGateway, TOOLS, runnable, deterministicNext, planView, newMemory, lookupHistory, TODAY, MONTH_DAYS, parseMeterCsv, recordFor, fingerprint, CSV_LIMITS };
+if (typeof module !== 'undefined' && module.exports) module.exports = { evidenceFacts, combineLevels, planRoomSetpoints, ROOMS, evidenceStrength, autonomyFor, EVIDENCE, quarantineBadReadings, LIMITS, TARIFF, SCENARIOS, EXTRA_SCENARIOS, ALL_SCENARIOS, MAX_STEPS, MAX_INVALID_PICKS, MAX_REPLANS, REPLANNABLE, needsReplan, replanView, parseReplan, applyReplan, recordReview, genScenario, get_local_meter_and_occupancy, detectLeak, slabCost, billFor, forecastBill, run_leak_and_bill_forecaster, validateNote, validateMeterRows, sanitize, buildOutbound, PUBLIC_RULE, heatGuard, applyReview, defaultDevice, writeGateway, TOOLS, runnable, deterministicNext, planView, newMemory, lookupHistory, TODAY, MONTH_DAYS, parseMeterCsv, recordFor, fingerprint, CSV_LIMITS };

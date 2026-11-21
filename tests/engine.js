@@ -5,7 +5,7 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 function makeEngine(workflow, opts) {
   opts = opts || {};
   // Nodes are named "1) Console form" in n8n; the tests use the plain names, so every name is stripped of its "N) " prefix here.
-  const strip = (s) => String(s).replace(/^\d+b?\) /, '');
+  const strip = (s) => String(s).replace(/^\d+[a-z]?\) /, '');
   const nodes = {}; workflow.nodes.forEach(n => { nodes[strip(n.name)] = n; });
   const connOf = {}; Object.keys(workflow.connections).forEach(k => { connOf[strip(k)] = (workflow.connections[k].main || []).map(port => port.map(c => ({ ...c, node: strip(c.node) }))); });
   const sd = opts.staticData || {};                    // persistent workflow static data ("memory")

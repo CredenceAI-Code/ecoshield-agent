@@ -1,12 +1,12 @@
 # EcoShield workflow notes: node by node (n8n)
 **On the n8n canvas every node name starts with its number, for example `1) Console form`, `2) Validate input`, `19b) Cloud call allowed?`, `37) Respond HTML`. The numbers match the node numbers in the Node Notes. This document uses the plain names.**
 
-All 38 nodes, in run order. Same four lines for each: In, Does, Out, Why (plus Notes where there is something to know). The 15 Code nodes are marked ★ and each one is explained in detail near the end, line by line, with a worked example using real numbers. Before that there is a short guide to the shared code (core.js) and to the state object that travels through the workflow, because most Code nodes are built from them.
+All 42 nodes, in run order. A one-line **Job** first (what the node is for), then the same four lines for each: In, Does, Out, Why (plus Notes where there is something to know). The Code nodes are marked ★ (15 of them are explained in detail near the end, line by line, with a worked example using real numbers; the two new ones, 17b and 17e, are explained in their own entries). Before that there is a short guide to the shared code (core.js) and to the state object that travels through the workflow, because most Code nodes are built from them.
 
 Read in this order: Words used, then "How the code nodes are built", then the node list, then the detailed code sections.
 
 ## Words used in these notes
-- **Node:** one step in the workflow (38 in total, 15 of them Code nodes).
+- **Node:** one step in the workflow (42 in total, 17 of them Code nodes).
 - **Item:** the bundle of data passed from node to node. Here it is one big object called `st` (short for state).
 - **Trigger:** the node that starts a run. There are two: the Console form (runs the agent) and the Dashboard hook (shows the dashboard).
 - **Code node:** a node where we write JavaScript. All our logic lives in these.
@@ -68,21 +68,25 @@ Every node receives one item and hands on one item. In EcoShield that item is a 
 ## Stage 1: Trigger and validate (nodes 1 to 3)
 
 ### 1. Console form (Form Trigger)
+- **Job:** Starts every run: a web form where a person picks the request, optionally uploads a meter CSV, and sets the approval wait limit or a failure drill.
 - **In:** Nothing. This is the start of every run.
-- **Does:** Shows a web form titled "EcoShield console". Five fields: **Scenario** (a required dropdown with 16 choices: scenarios 1 to 14, "UNDO - roll back the last applied change" and "RESET - clear the demo memory") and **Operator note** (optional text box; the placeholder says it is treated as data and checked for injection). Three more optional fields: **Meter reading (day, hour, L/h)** (one typed value that replaces a reading; impossible values are set aside, HS-5.3), **Offline room sensor (name)** and **Raise all unoccupied rooms to (C)** (HS-5.5).
+- **Does:** Shows a web form titled "EcoShield console". Eight fields: **Scenario** (a required dropdown with 16 choices: scenarios 1 to 14, "UNDO - roll back the last applied change" and "RESET - clear the demo memory") and **Operator note** (optional text box; the placeholder says it is treated as data and checked for injection). Three more optional fields: **Meter reading (day, hour, L/h)** (one typed value that replaces a reading; impossible values are set aside, HS-5.3), **Offline room sensor (name)** and **Raise all unoccupied rooms to (C)** (HS-5.5).
 - **Round 3 fields:** **Meter CSV file** (optional upload, checked in code in node 2), **Approval wait limit (minutes)** (default 15) and **Failure drill** (None / Groq outage). The earlier text above lists the original fields.
 - **Out:** 1 item with the answers.
 - **Why:** A person can start a run from a browser with no code. The dropdown means the input is one of a fixed list, not free text.
 - **Notes:** The form address is fixed (id be2bf8f1-b886-4585-950c-82bcc0648882), so re-importing never changes the link: http://localhost:5678/form/be2bf8f1-.... The workflow must be published for runs to count in memory.
 
 ### 2. Validate input (Code) ★
+- **Job:** The front door: checks the note, the meter file and the form fields in plain code, and stops bad input before any AI sees it.
 - **In:** The form answers.
 - **Does:** Reads the chosen scenario and note. Handles RESET and UNDO specially. Checks the note for prompt injection. Reads the optional meter-reading and room-sensor fields. Loads the device state from memory. Decides whether the run goes on (gate RUN) or is stopped at the door (gate REJECT).
 - **Out:** 1 item `st` with gate RUN or REJECT.
 - **Why:** Stage 2 of the reference diagram: validate and sanitise **before** any tool or AI sees anything.
 - **Notes:** Detailed section 2.
+- **Round 3:** reads the uploaded meter CSV (`parseMeterCsv`): required columns, 24 to 600 rows, 120 KB, ranges, no duplicates, no binary. A bad file is rejected before any AI (rule `upload_rejected`); the log records file name, size, rows and a fingerprint. Also reads the approval wait limit (default 15, clamp 1 to 60) and the failure drill.
 
 ### 3. Input accepted? (IF)
+- **Job:** Sends accepted requests on to planning and sends rejected ones straight to the log.
 - **In:** `st`.
 - **Does:** True if `st.gate` is RUN. True goes to Plan state; false goes to No write (node 30).
 - **Out:** The same item on one of two exits.
@@ -92,6 +96,7 @@ Every node receives one item and hands on one item. In EcoShield that item is a 
 The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, back to Plan state. It repeats until the AI (or the fixed order) says finish. Hard cap: 8 steps.
 
 ### 4. Plan state (Code) ★
+- **Job:** Works out which tools the agent may use next (code decides) and builds the question for the planner AI.
 - **In:** `st` from Validate input, or from Run tool on later turns.
 - **Does:** Works out which tools are allowed right now (code decides this), what the fixed fallback order would pick, and whether an AI call is needed. If it is, builds a sanitised prompt (no occupancy) and the three request bodies (Groq 120B, Groq 20B, Ollama).
 - **Out:** `st` plus runnableNow, det, need_llm, by_no_llm and (when needed) planBodies.
@@ -99,12 +104,14 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Detailed section 4.
 
 ### 5. Ask planner LLM? (IF)
+- **Job:** Chooses between asking an AI for the next tool and using the fixed tool order.
 - **In:** `st`.
 - **Does:** True if `need_llm`. True goes to Groq plan; false skips straight to Parse plan.
 - **Out:** The same item.
 - **Why:** If only one tool is allowed (for example, the first step is always read_meter_data), asking an AI would waste quota and time.
 
 ### 6. Groq plan (HTTP Request)
+- **Job:** Asks the main cloud model (Groq 120B) which tool to run next.
 - **In:** The item with planBodies.
 - **Does:** POSTs `planBodies.groq` to Groq (model openai/gpt-oss-120b, temperature 0, 120 tokens max, reasoning effort low) using the credential "Groq key".
 - **Out:** The AI's reply (JSON like {"next":"check_safety_guard","why":"..."}) on the success exit.
@@ -112,6 +119,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Timeout 15 s. No retry. On Error: continue using the error output, which leads to Groq 20B plan.
 
 ### 7. Groq 20B plan (HTTP Request)
+- **Job:** Backup for node 6: the smaller Groq model, with its own rate limit.
 - **In:** Runs only when Groq plan errored.
 - **Does:** Sends the same prompt to Groq's smaller model (openai/gpt-oss-20b). Different model, so it has its own rate limit.
 - **Out:** The reply, or an error that goes to Ollama plan.
@@ -119,6 +127,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Timeout 15 s. Reads the body from the Plan state node, not from the failed call: `$('Plan state').first().json.planBodies.groq20`.
 
 ### 8. Ollama plan (HTTP Request)
+- **Job:** Last backup for planning: the small model running on this laptop.
 - **In:** Runs only when Groq 20B plan errored.
 - **Does:** Sends the same prompt to Ollama on this laptop (qwen3:1.7b) at http://127.0.0.1:11434/api/chat.
 - **Out:** The reply, or an error.
@@ -126,28 +135,34 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Timeout 60 s. Both exits (success and error) go to Parse plan, so the run never stops here. Uses 127.0.0.1, not "localhost", because n8n tried the IPv6 address first and Ollama was not listening there.
 
 ### 9. Parse plan (Code) ★
+- **Job:** Reads the planner's pick, overrides any pick that is not allowed, falls back to the fixed order, and logs the tokens used.
 - **In:** Whatever came back: an AI reply, an error, or (when no AI was asked) the item itself.
 - **Does:** Reads the AI's pick, checks it against the allowed list, overrides it if it is not allowed, switches to the fixed order after 2 bad picks or if no AI answered. Adds one entry to plan_log.
 - **Out:** `st` with `choice`, `steps` +1 and a longer plan_log.
 - **Why:** The AI's answer is treated as a suggestion. Code decides what is accepted.
 - **Notes:** Detailed section 9.
+- **Round 3:** also logs `tokens`, `tokens_in` and `tokens_out` for every planner call. In a Groq-outage drill both Groq calls fail on purpose (model name set to `drill-groq-outage`), so the chain falls to the local model.
 
 ### 10. Finished? (IF)
+- **Job:** Loop gate: run another tool, or the plan is finished.
 - **In:** `st`.
 - **Does:** True if `choice` is "finish". True goes to Replan check (node 12); false goes to Run tool.
 - **Out:** The same item.
 - **Why:** The loop exit.
 
 ### 11. Run tool (Code) ★
+- **Job:** Runs the chosen allow-listed tool, with arguments built by code (meter data, leak and bill maths, history, safety guard).
 - **In:** `st` with `choice` set to one of four tools.
 - **Does:** Runs exactly that tool: read the meter data, run the leak and bill forecaster, look up case history, or check the safety guard. The arguments are built by code. Marks the tool as done. The forecaster step also stores the evidence score; the guard step also plans per-room setpoints when the room fields were filled in.
 - **Out:** `st` with the tool's result added; the loop goes back to Plan state.
 - **Why:** Stage 4 (act). The AI chose the order; it never builds an argument or touches data.
 - **Notes:** Detailed section 11.
+- **Round 3:** uses the uploaded file's rows when there is one (`recordFor`), otherwise the built-in scenario; the `read_meter_data` log line says which (`uploaded_file` or `canned_scenario`).
 
 ## Stage 3: Replan loop (nodes 12 to 17)
 
 ### 12. Replan check (Code) ★
+- **Job:** After the guard blocks a plan, decides whether the AI may propose one safer setpoint (maximum 2 tries).
 - **In:** `st` after the loop finished.
 - **Does:** Asks `needsReplan(st)`: was the plan blocked by a rule that an AI can fix, and are there tries left? If yes, builds a sanitised "propose a safer setpoint" prompt and the three request bodies.
 - **Out:** `st` with need_replan and (when needed) replanBodies.
@@ -155,12 +170,14 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Detailed section 12.
 
 ### 13. Replan needed? (IF)
+- **Job:** Gate: go to the replan AI, or go on to the automatic actions.
 - **In:** `st`.
 - **Does:** True if need_replan. True goes to Groq replan; false goes to Auto actions.
 - **Out:** The same item.
 - **Why:** Most runs are not blocked, so they skip this loop completely.
 
 ### 14. Groq replan (HTTP Request)
+- **Job:** Asks the main cloud model for one safer setpoint.
 - **In:** replanBodies.
 - **Does:** Same as Groq plan, but the prompt asks for one safer setpoint: {"action":"SETPOINT","setpoint_c":23,"why":"..."} or {"action":"NONE"}.
 - **Out:** The reply, or an error to Groq 20B replan.
@@ -168,6 +185,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Timeout 15 s, no retry, error output on.
 
 ### 15. Groq 20B replan (HTTP Request)
+- **Job:** Backup for node 14: the smaller Groq model.
 - **In:** Runs only when Groq replan errored.
 - **Does:** Same prompt to the 20B model.
 - **Out:** Reply, or error to Ollama replan.
@@ -175,6 +193,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Timeout 15 s.
 
 ### 16. Ollama replan (HTTP Request)
+- **Job:** Last backup for the replan: the local model.
 - **In:** Runs only when Groq 20B replan errored.
 - **Does:** Same prompt to local Ollama.
 - **Out:** Reply or error, both to Parse replan.
@@ -182,22 +201,56 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Timeout 60 s.
 
 ### 17. Parse replan (Code) ★
+- **Job:** Reads the AI's safer proposal and makes the guard re-check it before anything is accepted.
 - **In:** The AI's reply (or an error).
 - **Does:** Reads the proposal and hands it to `applyReplan`: the guard checks the proposed setpoint. Passed, no effect, rejected, unreadable, gave up, or no AI: each outcome is recorded. Then the item goes back to Replan check.
 - **Out:** `st` with replans longer by one and maybe rp_done set.
 - **Why:** The AI proposes; only the guard decides.
 - **Notes:** Detailed section 17. The loop Replan check, AI, Parse replan repeats at most 2 times.
 
+## Stage 3b: AI second opinion on the evidence level (nodes 17b to 17e), added Round 3 (option 3)
+
+### 17b. Evidence AI prompt (Code) ★
+- **Job:** Builds the plain-facts request for the AI's second opinion on how strong the leak evidence is.
+- **In:** `st` after the replan loop (or straight from Replan needed? for normal runs).
+- **Does:** If there is a leak finding and no alert is already open, takes `st.evidence_facts` (numbers only: flow in litres an hour, nights seen, longest run, lowest night flow each night, missing night readings, impossible readings set aside, meters disagreeing, age of the newest reading) and builds the request for the 20B model. The facts contain no score, no thresholds and nothing about who is in the building; a last regex check skips the cloud call if any occupancy-like word appears. In a Groq-outage drill the request is aimed at a model that does not exist, so the call fails on purpose.
+- **Out:** `st` with `ev_ai_needed` true or false and `ev_body` (the request).
+- **Why:** The organiser asked for the AI to do as much as possible without thresholds written in code. Here the AI judges the evidence from facts alone, while code keeps the final say.
+- **Notes:** Not in the detailed code sections below; the prompt asks the AI to count data problems, judge the flow, and answer HIGH, MEDIUM or LOW as JSON.
+
+### 17c. AI evidence needed? (IF)
+- **Job:** Skips the AI second opinion when there is nothing to judge.
+- **In:** `st` from Evidence AI prompt.
+- **Does:** True goes to Groq 20B evidence. False (no leak finding, an alert already open, rollback, or the privacy check skipped it) goes straight to Auto actions.
+- **Out:** the same `st`, on the true or false branch.
+- **Why:** No AI call, and no cost, when there is no decision to make.
+
+### 17d. Groq 20B evidence (HTTP Request)
+- **Job:** Asks the Groq 20B model for its HIGH, MEDIUM or LOW opinion.
+- **In:** `st.ev_body`.
+- **Does:** One call, temperature 0, 15 second wait limit, no retries. Both the answer and any error go on to Parse evidence.
+- **Out:** the AI's raw reply, or an error.
+- **Why:** If it fails, the run just continues with the code's level. The AI is optional, never a dependency.
+
+### 17e. Parse evidence (Code) ★
+- **Job:** Reads the AI's opinion, or records that there was none.
+- **In:** The AI's reply (or an error) and `st` from Evidence AI prompt.
+- **Does:** Extracts the JSON, accepts only HIGH, MEDIUM or LOW, and stores `st.ev_ai` {level, confidence, data_problems, reason}. Anything unreadable means no opinion. Writes an `evidence_review` line to the audit log either way (with tokens used).
+- **Out:** `st` with `ev_ai` (or null).
+- **Why:** An unusable AI answer must never block or change a run; the code level is used alone and the log says so.
+
 ## Stage 4: Automatic action and explanation (nodes 18 to 23)
 
 ### 18. Auto actions (Code) ★
+- **Job:** Raises the safe automatic alerts, depending on the final evidence level: code score and AI second opinion combined (HIGH auto, MEDIUM held for a person, LOW watch).
 - **In:** `st` (after the replan loop, or straight from Finished? for normal runs).
-- **Does:** If the leak check found LEAK, WATCH or INSUFFICIENT_DATA, looks at the evidence score and lets code set the autonomy level: HIGH (85 and up) raises the leak alert automatically (low risk, logged, can be undone), MEDIUM (50 to 84) holds the alert until a named person approves, LOW (under 50) raises nothing and only watches. Skips if an alert is already open for this scenario.
+- **Does:** If the leak check found LEAK, WATCH or INSUFFICIENT_DATA, combines the code's level (score 85 and up HIGH, 50 to 84 MEDIUM, under 50 LOW) with the AI's second opinion using a fixed rule: the agent acts alone only if code AND AI both say HIGH (alert raised automatically, logged, can be undone); if either says MEDIUM or higher, the alert is held until a named person approves; only if both say LOW does it raise nothing and just watch. If there is no usable AI answer, the code's level is used alone. The AI can hold an action back or ask for a review, but it can never make the agent act alone. The code level, the AI level and who decided are written to the audit log (`autonomy_level`). Skips if an alert is already open for this scenario.
 - **Out:** `st` with `auto` {status DONE, HELD, WATCH_ONLY, NO_CHANGE or FAILED} and `autonomy`.
 - **Why:** Stage 7a: safe, low-risk work with strong evidence needs no person. Weak evidence never acts alone. Everything is still logged and reversible.
 - **Notes:** Detailed section 18.
 
 ### 19. Build LLM prompt (Code) ★
+- **Job:** Builds the explanation request from allow-listed numbers only, and throws an error if anything about occupancy slips in.
 - **In:** `st` with results.
 - **Does:** Builds the prompt for the explainer AI. Only allow-listed numbers and neutral words go in. Runs a last check that nothing about occupancy is in the text, and throws an error if it is.
 - **Out:** `st` with outbound (what is sent), egress (what was stripped) and the three request bodies.
@@ -205,13 +258,15 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Detailed section 19.
 
 ### 19b. Cloud call allowed? (IF)
+- **Job:** Privacy gate: only calls the cloud AI if the privacy filter passed.
 - **In:** `st` from Build LLM prompt.
 - **Does:** Checks whether the privacy filter passed. If it did, the run goes on to the cloud explainer chain. If the filter failed, it goes straight to Parse LLM with no cloud call (HS-5.2).
 - **Out:** the same `st`, on the true or false branch.
 - **Why:** If the filter fails, the safest thing is to send nothing. The explanation then comes from the plain-code template.
-- **Notes:** This is the 38th node; it was added for the Round 2 curveball HS-5.2. The number 19b only avoids renumbering the other nodes.
+- **Notes:** It was the 38th node when it was added, for the Round 2 curveball HS-5.2. The number 19b only avoids renumbering the other nodes.
 
 ### 20. Groq explain (HTTP Request)
+- **Job:** Asks the main cloud model to write the plain-language explanation.
 - **In:** llm.groqBody.
 - **Does:** Sends the prompt to Groq 120B (temperature 0, 700 tokens max).
 - **Out:** A short JSON text: headline, explanation, tip.
@@ -219,6 +274,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Timeout 30 s. Retries 2 times, 1 s wait. On error, continues to Groq 20B explain.
 
 ### 21. Groq 20B explain (HTTP Request)
+- **Job:** Backup for node 20: the smaller Groq model.
 - **In:** Runs only when Groq explain failed.
 - **Does:** Same prompt, smaller model.
 - **Out:** Reply or error to Ollama explain.
@@ -226,6 +282,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Timeout 30 s, retries 2 times.
 
 ### 22. Ollama explain (HTTP Request)
+- **Job:** Last backup for the explanation: the local model.
 - **In:** Runs only when Groq 20B explain failed.
 - **Does:** Same prompt to local qwen3:1.7b.
 - **Out:** Reply or error, both to Parse LLM.
@@ -233,6 +290,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Timeout 90 s (slowest). 350 tokens max.
 
 ### 23. Parse LLM (Code) ★
+- **Job:** Checks the AI's text (no invented numbers, no rule-dodging advice, no rule codes) and swaps in a plain-code template if it fails or no AI answered.
 - **In:** The AI's reply, or an error.
 - **Does:** Extracts the JSON, then runs three guards on the text before it can be shown: no number the AI was not given, no advice to get around a safety rule, and no rule codes with underscores. If any guard fails, or no AI answered, a plain-code template is used instead.
 - **Out:** `st` with `ai` {provider, text, from_ai, note, tokens} and history_note.
@@ -242,39 +300,48 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 ## Stage 5: The human step and the write (nodes 24 to 30)
 
 ### 24. Needs approval? (IF)
+- **Job:** Gate: does this action need a named person's approval?
 - **In:** `st`.
 - **Does:** True if `guard.status` is NEEDS_APPROVAL. True goes to Approval form; false goes to Needs review?.
 - **Out:** The same item.
 - **Why:** Only an allowed-but-risky request asks a person to approve.
 
 ### 25. Approval form (Form)
+- **Job:** Pauses the run and asks a named person to approve or reject; after the wait limit with no answer, nothing is written.
 - **In:** `st`.
 - **Does:** Shows a second form page, "Human approval needed". The description line is built from the data: the request in words, the leak verdict, any earlier decision, and a note if this is the AI's replan. Fields: **Decision** (Approve or Reject, required), **Reviewer** (full name, required) and **Note** (optional). The run pauses here until someone submits.
 - **Out:** The three answers.
 - **Why:** The human-in-the-loop step. The text says "Nothing changes unless you approve with your name."
 - **Notes:** The note goes to the audit log and the page (HTML-escaped) and to no AI. The reviewer name is typed, not authenticated.
+- **Round 3:** has a wait limit (`limitWaitTime`, minutes from the form). If nobody answers, the run resumes with no decision.
 
 ### 26. Approve and write (Code) ★
+- **Job:** Turns the person's answer into approved yes/no and, only if approved, writes the change through the write gateway.
 - **In:** The form answers (`$json`) and the saved `st` from Parse LLM.
 - **Does:** Turns the answers into approved yes/no with `applyReview`. If approved, first raises a held (MEDIUM evidence) leak alert through the same gateway, then calls the write gateway for the request, which re-checks every limit and applies the change to the simulated device.
 - **Out:** `st` with `review` and `write`.
 - **Why:** Stage 7b and 8: the only place the building state can change.
 - **Notes:** Detailed section 26.
+- **Round 3:** no decision means timed out: nothing is written, the log gets an `approval_timeout` line (safe default: the action stays held for a named person).
 
 ### 27. Needs review? (IF)
+- **Job:** Gate: did the replan loop end with a case for a human review?
 - **In:** `st` from the "not needs approval" exit.
 - **Does:** True if `rp_done` is "review" (the replan cap was reached or the AI gave up). True goes to Review form; false goes to No write.
 - **Out:** The same item.
 - **Why:** Separates "a person must review why the AI could not find a safe plan" from "nothing to do".
 
 ### 28. Review form (Form)
+- **Job:** Pauses the run so a named person can acknowledge or escalate when the AI could not find a safe plan.
 - **In:** `st`.
 - **Does:** Shows "Human review: the AI could not find a safe plan". The description is `review_text`, which lists the first plan, the rule that blocked it and each replan with its result. Fields: **Decision** (Acknowledge: keep current settings, or Escalate to the facilities manager), **Reviewer**, **Note**.
 - **Out:** The answers.
 - **Why:** After the 2-replan cap, a person looks at the reasons. A review can never unblock a hard limit.
 - **Notes:** Pauses the run like Approval form.
+- **Round 3:** has the same wait limit as node 25; no answer is treated as not acknowledged.
 
 ### 29. Record review (Code) ★
+- **Job:** Records the reviewer's decision; it can never approve anything.
 - **In:** The review answers and `st` from Parse LLM.
 - **Does:** Records the decision and reviewer. Never approves anything: `approved` is always false.
 - **Out:** `st` with `review` {kind: replan_review} and write null.
@@ -282,6 +349,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Detailed section 29.
 
 ### 30. No write (Code) ★
+- **Job:** Records why nothing was written (nothing to change, input rejected, blocked, or approval timed out).
 - **In:** `st` from two exits: Input accepted? (false: the input was rejected at the door) and Needs review? (false: the request was blocked, or nothing needed changing).
 - **Does:** Logs why nothing was written (nothing to change, input rejected, or blocked before any approval was asked). Sets review and write to null.
 - **Out:** `st`.
@@ -291,6 +359,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 ## Stage 6: Remember, report, log (nodes 31 to 34)
 
 ### 31. Save memory (Code) ★
+- **Job:** Saves the run to memory in one all-or-nothing step (device state, undo stack, history, copy of the case).
 - **In:** `st` from Approve and write, Record review or No write.
 - **Does:** Commits the run to memory in one all-or-nothing step: device state, undo stack, decision history, run counter, and a copy of the whole case for the dashboard and replay.
 - **Out:** `st` plus the memory_commit trace line.
@@ -298,6 +367,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Detailed section 31.
 
 ### 32. Build page (Code) ★
+- **Job:** Builds the result page and the audit-log lines for the run.
 - **In:** `st`.
 - **Does:** Builds the result page (HTML) and the audit file text (one JSON line per event). Attaches the audit text as a file.
 - **Out:** 1 item: run_id, headline, html, number of events; the file attached as `data`.
@@ -305,6 +375,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Detailed section 32.
 
 ### 33. Write audit log (Read/Write Files from Disk)
+- **Job:** Appends the run's audit lines to the audit file on disk.
 - **In:** The item with the attached audit text.
 - **Does:** Appends the file to `~/.n8n-files/ecoshield_audit.jsonl` (the path is set when the workflow is generated; on this laptop it is under the user's home folder).
 - **Out:** The same item.
@@ -312,6 +383,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 - **Notes:** Operation: write, append on. n8n only allows file access inside `~/.n8n-files` by default. The audit file does contain occupancy state; only the sanitised payload ever goes to an AI.
 
 ### 34. Show result (Form, Form Ending)
+- **Job:** Shows the result page to the person.
 - **In:** The item.
 - **Does:** Shows the last page, "EcoShield result", whose body is the HTML from Build page.
 - **Out:** The page for the person who started the run.
@@ -322,6 +394,7 @@ The loop is: Plan state, (maybe an AI call), Parse plan, Finished?, Run tool, ba
 This path never runs the agent. It only reads memory and draws pages.
 
 ### 35. Dashboard hook (Webhook)
+- **Job:** Starts the dashboard path (a separate web address).
 - **In:** A browser opening http://localhost:5678/webhook/ecoshield-dashboard (GET). Optional `?run=ES-XXXX` to replay a past case.
 - **Does:** Starts the dashboard path.
 - **Out:** 1 item with the query.
@@ -329,6 +402,7 @@ This path never runs the agent. It only reads memory and draws pages.
 - **Notes:** Response mode: use the Respond to Webhook node. Needs the workflow published (the test URL differs).
 
 ### 36. Dashboard page (Code) ★
+- **Job:** Draws the dashboard, or replays a past case from memory without re-running anything.
 - **In:** The query.
 - **Does:** If `run` is given, finds that case in memory and draws it again as a replay (nothing is re-run). Otherwise draws the dashboard.
 - **Out:** { html }.
@@ -336,6 +410,7 @@ This path never runs the agent. It only reads memory and draws pages.
 - **Notes:** Detailed section 36.
 
 ### 37. Respond HTML (Respond to Webhook)
+- **Job:** Sends the dashboard page back to the browser.
 - **In:** { html }.
 - **Does:** Sends the HTML back to the browser with Content-Type text/html, status 200.
 - **Out:** The page.
@@ -384,7 +459,7 @@ Runs on every note (scenario 11 has a built-in one) before anything else sees it
 - The score starts at 100 and loses points for: missing night readings (up to 60), impossible readings set aside (up to 15), two meters that disagree (up to 30), a stale feed (up to 20), a short leak history or a weak signal near the 10 L/h rule (a small WATCH-level flow loses 20). Every deduction is returned with its reason and shown on the result page.
 - `autonomyFor` maps the score: 85 and up HIGH (alert raised automatically), 50 to 84 MEDIUM (alert held for a named person), under 50 LOW (nothing raised, watch only). No score at all fails closed to watch only.
 - **Real examples:** scenario 1 scores 100 (HIGH); scenario 4 scores 80 (MEDIUM, a small drip is a weaker signal); scenario 9 scores 40 (LOW, half the night readings are missing).
-- **Be honest:** the weights and cut-offs are our own design, not calibrated on real buildings. The AI never sees or changes the score.
+- **Be honest:** the weights and cut-offs are our own design, not calibrated on real buildings. The AI never sees the score. Round 3 option 3: an AI second opinion (from plain facts, no thresholds) is combined with the code level by `combineLevels`: both HIGH acts alone, either MEDIUM or higher goes to a named person, both LOW only watches; the AI can hold an action back but never make the agent act alone. `evidenceFacts` builds the facts the AI is shown.
 
 ### planRoomSetpoints(target, offline) (HS-5.5)
 - Five rooms. A room whose sensor is offline, or whose occupancy or temperature is missing, is assumed occupied and hot: held at the 24 C ceiling and never raised. Occupied rooms are held at 24 C. Other empty rooms are proposed the target (up to 27 C, a person must still approve). Above 27 C nothing is proposed.
