@@ -2,7 +2,7 @@
 **On the n8n canvas every node name starts with its number, for example `1) Console form`, `2) Validate input`, `19b) Cloud call allowed?`, `37) Respond HTML`. The numbers match the node numbers in the Node Notes. This document uses the plain names.**
 
 
-*Architecture note for judges. Written 2026-11-19 against the built workflow (v6, 38 nodes, `core.js`) and its tests. Synthetic data, DEWA published tariff (simplified, updated 2026-11-20), simulated device. It replaces the EcoWatch note (`../ARCHITECTURE_NOTE.md`), which described the earlier placeholder build.*
+*Architecture note for judges. Written 2026-11-19 against the built workflow (v7, 42 nodes, `core.js`) and its tests. Synthetic data, DEWA published tariff (simplified, updated 2026-11-20), simulated device. It replaces the EcoWatch note (`../ARCHITECTURE_NOTE.md`), which described the earlier placeholder build.*
 
 ## 30-second spoken version
 

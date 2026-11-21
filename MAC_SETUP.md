@@ -57,7 +57,7 @@ That is the model we tested. With 16 GB you could use `qwen3:4b` (better answers
 ## 7. Files in this folder
 - `CLAUDE.md` a short project brief that Claude Code reads automatically when started in this folder, so it has the context.
 - `event_docs/` the organisers' manual and the Domain 5 statement.
-- `core.js` all the safety, leak and bill logic; `page_js.js` the result and dashboard pages; `make_ecoshield_workflow.py` builds `ecoshield_workflow.json` (38 nodes).
+- `core.js` all the safety, leak and bill logic; `page_js.js` the result and dashboard pages; `make_ecoshield_workflow.py` builds `ecoshield_workflow.json` (42 nodes).
 - `EcoShield_Workflow_Node_Notes.pdf` / `.md` what every node does; `study_pdf/EcoShield_Round1_Study_Guide.pdf` the 18-page study guide; `ARCHITECTURE_NOTE.md` the judge-facing note; `PLAN.md`, `CHECKPOINTS.md`, `README.md`, `STUDY_GUIDE.md`.
 - `EcoShield_Agent_export_2026-11-20_v5.json` the exact workflow exported from the Windows laptop (a backup; use step 3 instead of importing it directly).
 - `data/` the synthetic meter data and scenarios; `tests/` the checks.
