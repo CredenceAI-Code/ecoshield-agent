@@ -482,7 +482,7 @@ return [{ json: { html } }];
 # ------------------------------------------------------------------- the graph
 add("Console form", "n8n-nodes-base.formTrigger", {
     "formTitle": "EcoShield console",
-    "formDescription": "Pick the request (the demo scenarios double as request presets). Optionally upload a meter CSV (day,hour,water_lph,kwh,occupied,outdoor_c) to run on your own data instead of the built-in scenario data. All building data is synthetic and stays on this laptop. UNDO and RESET are on the list too. Dashboard: http://localhost:5678/webhook/ecoshield-dashboard",
+    "formDescription": "Pick the request (the demo scenarios double as request presets). Optionally upload a meter CSV (day,hour,water_lph,kwh,occupied,outdoor_c) to run on your own data instead of the built-in scenario data. All building data is synthetic. n8n runs on this laptop; only allow-listed result numbers go to the cloud AI, never occupancy or schedules. UNDO and RESET are on the list too. Dashboard: http://localhost:5678/webhook/ecoshield-dashboard",
     "formFields": {"values": [
         {"fieldLabel": "Scenario", "fieldType": "dropdown", "requiredField": True,
          "fieldOptions": {"values": [{"option": l} for l in SCENARIO_LABELS]}},
